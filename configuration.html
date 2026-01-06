@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MT & B-One | Configuration Officielle</title>
+    
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#7d2ae8">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MT & B-One">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <style>
+        :root { 
+            --canva-purple: #7d2ae8; 
+            --canva-blue: #00c4cc; 
+            --canva-gradient: linear-gradient(135deg, #7d2ae8 0%, #00c4cc 100%);
+            --blue-readonly: #1a237e;
+        }
+        
+        body { background-color: #f4f7f6; font-family: 'Segoe UI', sans-serif; transition: 0.3s; min-height: 100vh; display: flex; flex-direction: column; }
+        
+        /* Header Dynamique - Logo Agrandi */
+        .app-header { background: var(--canva-gradient); color: white; padding: 1rem 0; }
+        .header-logo { height: 80px; width: 80px; object-fit: contain; border-radius: 12px; background: rgba(255,255,255,0.2); padding: 5px; }
+        .app-brand { font-size: 1.8rem; letter-spacing: 1px; }
+        .promoter-name { font-size: 0.85rem; opacity: 0.9; font-weight: 500; }
+        
+        .navbar-light .navbar-nav .nav-link { color: rgba(255,255,255,0.8) !important; font-weight: 500; }
+        .navbar-light .navbar-nav .nav-link:hover { color: white !important; }
+
+        /* Card & Inputs */
+        .card-setup { border-radius: 24px; border: none; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
+        .form-control, .form-select { border-radius: 12px; padding: 12px; border: 1px solid #e0e0e0; }
+        
+        /* Mode Lecture Seule Bleu Foncé */
+        .locked-mode .form-control:read-only, 
+        .locked-mode .form-select:disabled {
+            background-color: var(--blue-readonly) !important;
+            color: #ffffff !important;
+            border: none !important;
+            pointer-events: none;
+        }
+
+        /* Buttons */
+        .btn-action { border-radius: 30px; padding: 14px; font-weight: 700; text-transform: uppercase; border: none; }
+        .btn-save { background: var(--canva-gradient); color: white; }
+        .btn-unlock { background: #ff3b30; color: white; }
+        
+        /* Media Display - Aperçu Agrandi */
+        .preview-box { border: 2px dashed #ddd; border-radius: 15px; padding: 15px; text-align: center; background: #fff; min-height: 160px; }
+        .preview-img-form { max-height: 120px; width: auto; border-radius: 8px; display: none; margin: 10px auto; }
+        .final-signature { max-height: 100px; display: none; margin: 20px auto; filter: contrast(1.2); }
+        
+        .hidden-el { display: none !important; }
+
+        /* Footer Signature */
+        .footer-concepteur { background: #212529; color: white; text-align: center; padding: 20px 10px; margin-top: auto; }
+    </style>
+</head>
+<body>
+
+<header class="app-header shadow-lg">
+    <nav class="navbar navbar-expand-lg navbar-light p-0">
+        <div class="container px-4">
+            <div class="d-flex align-items-center gap-3">
+                <img id="navLogo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-logo" alt="">
+                <div class="brand-group">
+                    <h1 id="navCompanyName" class="app-brand fw-bold mb-0">MT & B-One</h1>
+                    <span class="promoter-name">Interface de Gestion PDG</span>
+                </div>
+            </div>
+            <button class="navbar-toggler border-white" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav ms-auto text-end">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
+                    <li class="nav-item"><a class="nav-link" href="produits.html">Produits</a></li>
+                    <li class="nav-item"><a class="nav-link" href="panier.html">Panier</a></li>
+                    <li class="nav-item"><a class="nav-link" href="paiement.html">Suivi Paiements</a></li>
+                    <li class="nav-item"><a class="nav-link" href="comptabilite.html">Comptabilité</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="configuration.html">Configuration</a></li>
+                    <li class="nav-item"><a class="nav-link" href="maintenance.html">Maintenance</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>
+
+<main class="container py-5">
+    <div class="card card-setup p-4 bg-white">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold h4">Configuration Système</h2>
+            <p class="text-muted small">Identité Visuelle & Signature Officielle</p>
+        </div>
+
+        <form id="robustForm">
+            <div class="row g-3 mb-4" id="uploadZone">
+                <div class="col-6">
+                    <div class="preview-box">
+                        <label class="form-label small fw-bold">LOGO ENTREPRISE</label>
+                        <input type="file" id="logoInp" class="hidden-el" accept="image/*">
+                        <div onclick="document.getElementById('logoInp').click()" style="cursor:pointer">
+                            <i class="bi bi-image fs-1 text-muted" id="logoPlaceholder"></i>
+                            <img id="logoPrev" class="preview-img-form">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="preview-box">
+                        <label class="form-label small fw-bold">SIGNATURE PDG</label>
+                        <input type="file" id="signInp" class="hidden-el" accept="image/*">
+                        <div onclick="document.getElementById('signInp').click()" style="cursor:pointer">
+                            <i class="bi bi-pen fs-1 text-muted" id="signPlaceholder"></i>
+                            <img id="signPrev" class="preview-img-form">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12">
+                    <label class="form-label fw-bold">Nom de l'Entreprise</label>
+                    <input type="text" id="companyName" class="form-control" placeholder="Nom de votre société" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">RC / IFU</label>
+                    <input type="text" id="regNumber" class="form-control">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Devise</label>
+                    <input type="text" id="currency" class="form-control" value="F CFA">
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-bold">Nom du PDG</label>
+                    <input type="text" id="ceoName" class="form-control" placeholder="Nom complet du PDG">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">WhatsApp PDG</label>
+                    <input type="tel" id="ceoWhatsapp" class="form-control" placeholder="+229 ...">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Email PDG</label>
+                    <input type="email" id="ceoEmail" class="form-control" placeholder="email@exemple.com">
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-bold">Pays Pivot</label>
+                    <select id="mainCountry" class="form-select">
+                        <option value="Bénin">Bénin</option>
+                        <option value="Côte d'Ivoire">Côte d'Ivoire</option>
+                        <option value="Togo">Togo</option>
+                        <option value="France">France</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <img id="finalSignature" class="final-signature" alt="Signature PDG">
+                <p id="signLabel" class="small text-muted d-none">Document validé par la signature du PDG</p>
+            </div>
+
+            <div class="mt-4 d-grid gap-2">
+                <button type="submit" id="mainBtn" class="btn btn-action btn-save w-100 shadow">
+                    <i class="bi bi-lock-fill me-2"></i>Sauvegarder et verrouiller
+                </button>
+            </div>
+        </form>
+    </div>
+</main>
+
+<footer class="footer-concepteur">
+    <div class="container">
+        <p class="mb-1 small opacity-75">Application conçue et développée par</p>
+        <h6 class="fw-bold mb-2">Atizoun Plateny AMOUSSOU</h6>
+        <div class="d-flex justify-content-center gap-3 small">
+            <span><i class="bi bi-envelope"></i> atizoun@gmail.com</span>
+            <span><i class="bi bi-telephone"></i> 01 97 74 40 35</span>
+        </div>
+    </div>
+</footer>
+
+<script>
+    const STORAGE_KEY = 'BONE_OFFICIAL_CONFIG_V2';
+    const fields = ['companyName', 'regNumber', 'currency', 'mainCountry', 'ceoName', 'ceoWhatsapp', 'ceoEmail'];
+    let isLocked = false;
+
+    const UI = {
+        lock() {
+            isLocked = true;
+            document.body.classList.add('locked-mode');
+            fields.forEach(id => {
+                const el = document.getElementById(id);
+                if(el.tagName === 'SELECT') el.disabled = true;
+                else el.readOnly = true;
+            });
+            document.getElementById('uploadZone').classList.add('hidden-el');
+            document.getElementById('finalSignature').style.display = 'block';
+            document.getElementById('signLabel').classList.remove('d-none');
+            
+            const btn = document.getElementById('mainBtn');
+            btn.innerHTML = '<i class="bi bi-unlock-fill me-2"></i>Déverrouiller pour modification';
+            btn.className = 'btn btn-action btn-unlock w-100 shadow';
+        },
+        unlock() {
+            isLocked = false;
+            document.body.classList.remove('locked-mode');
+            fields.forEach(id => {
+                const el = document.getElementById(id);
+                if(el.tagName === 'SELECT') el.disabled = false;
+                else el.readOnly = false;
+            });
+            document.getElementById('uploadZone').classList.remove('hidden-el');
+            document.getElementById('finalSignature').style.display = 'none';
+            document.getElementById('signLabel').classList.add('d-none');
+            
+            const btn = document.getElementById('mainBtn');
+            btn.innerHTML = '<i class="bi bi-lock-fill me-2"></i>Sauvegarder et verrouiller';
+            btn.className = 'btn btn-action btn-save w-100 shadow';
+        }
+    };
+
+    const Data = {
+        save() {
+            const config = {};
+            fields.forEach(id => config[id] = document.getElementById(id).value);
+            config.logo = document.getElementById('logoPrev').src;
+            config.sign = document.getElementById('signPrev').src;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+            this.applyLogos(config.logo, config.sign);
+            if(config.companyName) document.getElementById('navCompanyName').innerText = config.companyName;
+        },
+        applyLogos(logo, sign) {
+            if(logo && logo.startsWith('data:')) {
+                document.getElementById('navLogo').src = logo;
+                document.getElementById('logoPrev').src = logo;
+                document.getElementById('logoPrev').style.display = 'block';
+                document.getElementById('logoPlaceholder').classList.add('hidden-el');
+            }
+            if(sign && sign.startsWith('data:')) {
+                document.getElementById('signPrev').src = sign;
+                document.getElementById('finalSignature').src = sign;
+                document.getElementById('signPrev').style.display = 'block';
+                document.getElementById('signPlaceholder').classList.add('hidden-el');
+            }
+        },
+        load() {
+            const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+            if(!data) {
+                // Initialisation par défaut avec le nouveau nom
+                document.getElementById('companyName').value = "MT & B-One";
+                document.getElementById('navCompanyName').innerText = "MT & B-One";
+                return;
+            }
+            fields.forEach(id => { if(data[id]) document.getElementById(id).value = data[id]; });
+            if(data.companyName) document.getElementById('navCompanyName').innerText = data.companyName;
+            this.applyLogos(data.logo, data.sign);
+            UI.lock();
+        }
+    };
+
+    document.getElementById('robustForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if(!isLocked) {
+            if(confirm("Confirmez-vous la sauvegarde et le verrouillage des données ?")) {
+                Data.save();
+                UI.lock();
+            }
+        } else {
+            if(confirm("Voulez-vous vraiment déverrouiller le système pour modification ?")) {
+                UI.unlock();
+            }
+        }
+        if(navigator.vibrate) navigator.vibrate(100);
+    });
+
+    function setupImage(inpId, prevId, placeId) {
+        document.getElementById(inpId).onchange = (e) => {
+            if(!e.target.files[0]) return;
+            const reader = new FileReader();
+            reader.readAsDataURL(e.target.files[0]);
+            reader.onload = (ev) => {
+                const imgBase64 = ev.target.result;
+                document.getElementById(prevId).src = imgBase64;
+                document.getElementById(prevId).style.display = 'block';
+                document.getElementById(placeId).classList.add('hidden-el');
+                if(inpId === 'logoInp') document.getElementById('navLogo').src = imgBase64;
+                if(inpId === 'signInp') document.getElementById('finalSignature').src = imgBase64;
+            };
+        };
+    }
+    setupImage('logoInp', 'logoPrev', 'logoPlaceholder');
+    setupImage('signInp', 'signPrev', 'signPlaceholder');
+
+    window.onload = () => Data.load();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(registration => {
+                    console.log('Service Worker enregistré avec succès:', registration.scope);
+                })
+                .catch(error => {
+                    console.error('L\'enregistrement du Service Worker a échoué:', error);
+                });
+        });
+    }
+</script>
+</body>
+</html>

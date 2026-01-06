@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B-one | Accueil</title>
+    
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#7d2ae8">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="B-one">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root { 
+            --canva-purple: #7d2ae8; 
+            --canva-blue: #00c4cc; 
+            --canva-gradient: linear-gradient(135deg, #7d2ae8 0%, #00c4cc 100%);
+        }
+        
+        body { background-color: #f4f7f6; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+        
+        /* Header Premium & Navbar */
+        .app-header { 
+            background: var(--canva-gradient); 
+            color: white; 
+            padding-bottom: 3rem; 
+            border-bottom-left-radius: 30px; 
+            border-bottom-right-radius: 30px;
+            box-shadow: 0 10px 20px rgba(125, 42, 232, 0.2);
+        }
+        
+        .navbar-light .navbar-nav .nav-link { color: rgba(255,255,255,0.8) !important; font-weight: 500; }
+        .navbar-light .navbar-nav .nav-link:hover { color: white !important; }
+        
+        .header-logo { height: 80px; width: 80px; object-fit: contain; border-radius: 15px; background: rgba(255,255,255,0.2); padding: 5px; }
+        .app-brand { font-size: 1.8rem; letter-spacing: 1px; }
+        .promoter-name-nav { font-size: 0.85rem; opacity: 0.9; font-weight: 500; }
+
+        /* Menu Grid Style Android */
+        .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; padding: 20px; margin-top: -40px; }
+        
+        .menu-card { 
+            background: white; 
+            border-radius: 24px; 
+            padding: 25px 15px; 
+            text-align: center; 
+            text-decoration: none; 
+            color: #333; 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid rgba(0,0,0,0.02);
+            position: relative;
+        }
+        
+        .menu-card:active { transform: scale(0.95); }
+        
+        .icon-circle { 
+            width: 65px; height: 65px; border-radius: 20px; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 1.8rem; margin: 0 auto 15px; color: white;
+        }
+        
+        .bg-boutique { background: linear-gradient(135deg, #FF9244 0%, #FF5E3A 100%); }
+        .bg-panier { background: linear-gradient(135deg, #00C4CC 0%, #008C91 100%); }
+        .bg-config { background: linear-gradient(135deg, #7D2AE8 0%, #5B1BB8 100%); }
+        .bg-pv { background: linear-gradient(135deg, #FFCC00 0%, #FF9500 100%); }
+        .bg-stats { background: linear-gradient(135deg, #4CD964 0%, #28A745 100%); }
+        .bg-contact { background: linear-gradient(135deg, #5856D6 0%, #323193 100%); }
+
+        .menu-label { font-weight: 700; font-size: 0.95rem; display: block; }
+        .menu-sub { font-size: 0.7rem; color: #888; margin-top: 4px; }
+        
+        .badge-count {
+            position: absolute; top: 15px; right: 15px;
+            background: #ff3b30; color: white; font-size: 0.7rem;
+            padding: 2px 8px; border-radius: 10px; font-weight: bold;
+        }
+
+        /* Nouveau: Produit Phare & Graphique */
+        .featured-card { 
+            background: white; border-radius: 24px; padding: 20px; 
+            margin: 20px; box-shadow: 0 8px 25px rgba(0,0,0,0.05);
+        }
+        .phare-img { width: 80px; height: 80px; border-radius: 15px; object-fit: cover; }
+        .chart-container { height: 250px; position: relative; }
+
+        .promoter-footer { text-align: center; padding: 20px; color: #aaa; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+<header class="app-header shadow-lg">
+    <nav class="navbar navbar-expand-lg navbar-light p-3">
+        <div class="container px-0">
+            <div class="d-flex align-items-center gap-3">
+                <img id="navLogo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-logo" style="height: 50px; width: 50px;" alt="">
+                <div class="brand-group">
+                    <h1 class="app-brand fw-bold mb-0" style="font-size: 1.4rem;">B-one</h1>
+                    <span class="promoter-name-nav" id="navPromoterName">ASSAÏ Boni Awé Didier</span>
+                </div>
+            </div>
+            <button class="navbar-toggler border-white" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav ms-auto text-end">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
+                    <li class="nav-item"><a class="nav-link" href="produits.html">Produits</a></li>
+                    <li class="nav-item"><a class="nav-link" href="panier.html">Panier</a></li>
+                    <li class="nav-item"><a class="nav-link" href="paiement.html">Paiement</a></li>
+                    <li class="nav-item"><a class="nav-link" href="comptabilite.html">Comptabilité</a></li>
+                    <li class="nav-item"><a class="nav-link" href="configuration.html">Configuration</a></li>
+                    <li class="nav-item"><a class="nav-link" href="maintenance.html">Maintenance</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container text-center mt-3">
+        <img id="mainLogo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-logo mb-3" alt="Logo">
+        <h2 id="displayCompanyName" class="h3 fw-bold mb-1">B-one</h2>
+        <p class="small opacity-75 mb-0 text-white">Tableau de bord de gestion</p>
+    </div>
+</header>
+
+<main class="container">
+    <div class="menu-grid" id="menuGrid"></div>
+
+    <div class="featured-card">
+        <h6 class="fw-bold mb-3"><i class="bi bi-star-fill text-warning me-2"></i>Produit Phare (Top Ventes)</h6>
+        <div id="phareContent" class="d-flex align-items-center gap-3">
+            <p class="text-muted small">Aucune donnée de vente pour le moment.</p>
+        </div>
+    </div>
+
+    <div class="featured-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0"><i class="bi bi-graph-up text-primary me-2"></i>Évolution Marché</h6>
+            <select id="chartFilter" class="form-select form-select-sm w-auto rounded-pill" onchange="updateMarketChart()">
+                <option value="all">Tous les produits</option>
+            </select>
+        </div>
+        <div class="chart-container">
+            <canvas id="marketChart"></canvas>
+        </div>
+    </div>
+
+    <div id="installArea" class="container mt-3 text-center" style="display: none;">
+        <button id="installBtn" class="btn btn-primary rounded-pill px-4 shadow-sm" style="background: var(--canva-purple); border: none;">
+            <i class="bi bi-download me-2"></i>Installer l'application B-one
+        </button>
+    </div>
+
+    <div class="promoter-footer">
+        <p class="mb-0">Application Propriétaire - <span id="footerBrand">B-one</span></p>
+        <p class="fw-bold">Promoteur : <span id="footerPromoter">ASSAÏ Boni Awé Didier</span></p>
+    </div>
+</main>
+
+<script>
+    const CONFIG_KEY = 'BONE_OFFICIAL_CONFIG_V2';
+    const PROD_KEY = 'BONE_PRODUCTS_LIST';
+    const ORDER_KEY = 'BONE_ORDERS_HISTORY';
+    let myChart = null;
+
+    function initApp() {
+        const config = JSON.parse(localStorage.getItem(CONFIG_KEY)) || {};
+        const products = JSON.parse(localStorage.getItem(PROD_KEY)) || [];
+        const orders = JSON.parse(localStorage.getItem(ORDER_KEY)) || [];
+
+        // 1. Identité
+        if (config.companyName) {
+            document.getElementById('displayCompanyName').innerText = config.companyName;
+            document.getElementById('footerBrand').innerText = config.companyName;
+        }
+        if (config.ceoName) {
+            document.getElementById('navPromoterName').innerText = config.ceoName;
+            document.getElementById('footerPromoter').innerText = config.ceoName;
+        }
+        if (config.logo) {
+            document.getElementById('navLogo').src = config.logo;
+            document.getElementById('mainLogo').src = config.logo;
+        }
+
+        // 2. Grille Menu
+        renderMenu(products.length, orders.length, orders);
+
+        // 3. Déterminer Produit Phare
+        renderFeaturedProduct(orders, products);
+
+        // 4. Initialiser le filtre du graphique
+        const filter = document.getElementById('chartFilter');
+        const uniqueProds = [...new Set(orders.map(o => o.prodName))];
+        uniqueProds.forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.innerText = name;
+            filter.appendChild(opt);
+        });
+
+        // 5. Lancer le graphique
+        updateMarketChart();
+    }
+
+    function renderMenu(pCount, oCount, orders) {
+        const totalSales = orders.reduce((acc, curr) => acc + (parseFloat(curr.price) || 0), 0);
+        const menuItems = [
+            { label: "Produits", sub: `${pCount} articles`, icon: "bi-box", bg: "bg-boutique", link: "produits.html", count: pCount },
+            { label: "Commandes", sub: `${oCount} factures`, icon: "bi-cart", bg: "bg-panier", link: "panier.html", count: oCount },
+            { label: "Ventes", sub: `${totalSales.toLocaleString()} F`, icon: "bi-cash-coin", bg: "bg-stats", link: "panier.html", count: null },
+            { label: "Rapports", sub: "Suivi P.V.", icon: "bi-file-text", bg: "bg-pv", link: "pv.html", count: null }
+        ];
+
+        document.getElementById('menuGrid').innerHTML = menuItems.map(item => `
+            <a href="${item.link}" class="menu-card">
+                ${item.count ? `<span class="badge-count">${item.count}</span>` : ''}
+                <div class="icon-circle ${item.bg}"><i class="bi ${item.icon}"></i></div>
+                <span class="menu-label">${item.label}</span>
+                <span class="menu-sub">${item.sub}</span>
+            </a>`).join('');
+    }
+
+    function renderFeaturedProduct(orders, products) {
+        if(orders.length === 0) return;
+        
+        const counts = {};
+        orders.forEach(o => counts[o.prodName] = (counts[o.prodName] || 0) + 1);
+        const topProduct = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+        const prodData = products.find(p => p.name === topProduct) || {};
+
+        document.getElementById('phareContent').innerHTML = `
+            <img src="${prodData.img || 'https://via.placeholder.com/80'}" class="phare-img">
+            <div>
+                <h6 class="fw-bold mb-0">${topProduct}</h6>
+                <p class="small text-muted mb-0">${counts[topProduct]} ventes réalisées</p>
+                <span class="badge bg-success-subtle text-success mt-1">En forte demande</span>
+            </div>`;
+    }
+
+    function updateMarketChart() {
+        const filterValue = document.getElementById('chartFilter').value;
+        const orders = JSON.parse(localStorage.getItem(ORDER_KEY)) || [];
+        
+        let filteredData = (filterValue === 'all') ? orders : orders.filter(o => o.prodName === filterValue);
+        
+        const labels = filteredData.map((_, i) => `Vente ${i+1}`);
+        const dataValues = filteredData.map(o => parseFloat(o.price) || 0);
+
+        if (myChart) myChart.destroy();
+
+        const ctx = document.getElementById('marketChart').getContext('2d');
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Valeur Marché (F CFA)',
+                    data: dataValues,
+                    borderColor: '#7d2ae8',
+                    backgroundColor: 'rgba(125, 42, 232, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { 
+                    y: { beginAtZero: true, grid: { display: false } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    window.onload = initApp;
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker enregistré !'))
+        .catch(err => console.log('Erreur SW:', err));
+    });
+  }
+</script>
+
+<script>
+    let deferredPrompt;
+    const installArea = document.getElementById('installArea');
+    const installBtn = document.getElementById('installBtn');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Empêcher l'affichage automatique de la bannière
+        e.preventDefault();
+        // Garder l'événement de côté
+        deferredPrompt = e;
+        // Afficher notre bouton d'installation
+        installArea.style.display = 'block';
+
+        installBtn.addEventListener('click', () => {
+            // Cacher le bouton après le clic
+            installArea.style.display = 'none';
+            // Afficher le prompt d'installation natif
+            deferredPrompt.prompt();
+            // Réagir à la décision de l'utilisateur
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('Utilisateur a accepté l\'installation');
+                }
+                deferredPrompt = null;
+            });
+        });
+    });
+
+    window.addEventListener('appinstalled', () => {
+        // Cacher complètement la zone si déjà installé
+        installArea.style.display = 'none';
+        deferredPrompt = null;
+    });
+</script>
+</body>
+</html>

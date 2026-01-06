@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MT & B-One | Catalogue Produits</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#7d2ae8">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MT & B-One">
+    <link rel="apple-touch-icon" href="https://via.placeholder.com/192/7d2ae8/ffffff?text=MT">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <style>
+        :root { 
+            --canva-purple: #7d2ae8; 
+            --canva-blue: #00c4cc; 
+            --canva-gradient: linear-gradient(135deg, #7d2ae8 0%, #00c4cc 100%);
+        }
+        
+        body { background-color: #f4f7f6; font-family: 'Segoe UI', sans-serif; }
+        
+        /* Header & Navbar */
+        .app-header { background: var(--canva-gradient); color: white; padding: 0.5rem 0; }
+        .header-logo { height: 45px; width: 45px; object-fit: contain; border-radius: 10px; background: rgba(255,255,255,0.2); padding: 3px; }
+        
+        .navbar-dark .navbar-nav .nav-link { color: rgba(255,255,255,0.9) !important; font-weight: 500; font-size: 0.9rem; }
+        .navbar-dark .navbar-nav .nav-link:hover { color: #fff !important; }
+        .navbar-toggler { border: none; padding: 0; }
+        .navbar-toggler:focus { box-shadow: none; }
+
+        /* Barre de Recherche */
+        .search-container { margin-top: -25px; position: relative; z-index: 10; }
+        .search-input { 
+            border-radius: 30px; border: none; padding: 15px 25px 15px 50px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); font-size: 1rem;
+        }
+        .search-icon { position: absolute; left: 20px; top: 15px; color: #888; font-size: 1.2rem; }
+
+        /* Filtres Catégories */
+        .category-scroll { display: flex; overflow-x: auto; gap: 10px; padding: 15px 0; scrollbar-width: none; }
+        .category-scroll::-webkit-scrollbar { display: none; }
+        .cat-badge { 
+            white-space: nowrap; padding: 8px 20px; border-radius: 20px; 
+            background: white; color: #555; font-weight: 600; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid transparent;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .cat-badge.active { background: var(--canva-purple); color: white; }
+        .btn-del-cat { font-size: 0.7rem; opacity: 0.6; }
+        .btn-del-cat:hover { opacity: 1; color: #ff3b30; }
+
+        /* Grille Produits */
+        .product-card { 
+            border: none; border-radius: 20px; overflow: hidden; 
+            transition: 0.3s; background: white; height: 100%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05); cursor: pointer;
+        }
+        .product-card:hover { transform: translateY(-5px); }
+        .img-container { height: 180px; background: #f8f8f8; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .product-img { max-width: 80%; max-height: 80%; object-fit: contain; }
+        
+        .price-tag { color: var(--canva-purple); font-weight: 800; font-size: 1.1rem; }
+        .btn-edit-prod, .btn-cart-prod { 
+            width: 36px; height: 36px; border-radius: 10px; 
+            background: #f0f0f0; color: #555; 
+            display: flex; align-items: center; justify-content: center; border: none;
+            transition: 0.2s;
+        }
+        .btn-edit-prod:hover { background: var(--canva-blue); color: white; }
+        .btn-cart-prod:hover { background: #25D366; color: white; }
+
+        /* Modales */
+        .modal-content { border-radius: 30px; border: none; }
+        #captureArea { padding: 30px; background: white; border-radius: 25px; position: relative; }
+        .modal-product-img { max-width: 100%; height: 200px; object-fit: contain; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto; }
+        
+        .marketing-banner { background: var(--canva-gradient); color: white; border-radius: 12px; padding: 10px; margin-bottom: 20px; font-size: 0.8rem; font-weight: 600; }
+        .order-info { border-top: 1px solid #eee; margin-top: 15px; padding-top: 15px; font-size: 0.85rem; }
+        .modal-signature { max-height: 50px; margin-top: 5px; filter: contrast(1.1); }
+
+        .share-btn-img { background: #25D366; color: white; border-radius: 30px; padding: 12px 25px; font-weight: 700; border: none; transition: 0.3s; margin-bottom: 10px; }
+        .share-btn-link { background: var(--canva-purple); color: white; border-radius: 30px; padding: 12px 25px; font-weight: 700; border: none; transition: 0.3s; margin-bottom: 10px; }
+        .share-btn-status { background: #00c4cc; color: white; border-radius: 30px; padding: 12px 25px; font-weight: 700; border: none; transition: 0.3s; margin-bottom: 10px; }
+        .share-btn-status:hover, .share-btn-img:hover, .share-btn-link:hover { opacity: 0.9; }
+        .btn-close-modal { background: #6c757d; color: white; border-radius: 30px; padding: 12px 25px; font-weight: 700; border: none; transition: 0.3s; margin-bottom: 10px; }
+
+        /* Boutons Flottants */
+        .btn-plus-float { position: fixed; bottom: 90px; right: 20px; width: 60px; height: 60px; border-radius: 30px; background: var(--canva-blue); color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 20px rgba(0, 196, 204, 0.4); z-index: 1000; border: none; }
+
+        .admin-section { background: white; border-radius: 20px; padding: 20px; margin-top: 40px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        .canal-box { border: 1px solid #eee; border-radius: 15px; padding: 10px; margin-bottom: 10px; background: #fafafa; }
+        
+        .highlight-new { animation: pulse-border 2s ease-in-out; }
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0px var(--canva-purple); }
+            50% { box-shadow: 0 0 0 10px rgba(125, 42, 232, 0.2); }
+            100% { box-shadow: 0 0 0 0px transparent; }
+        }
+        .price-detail-box { font-size: 0.75rem; color: #777; background: #fdfdfd; padding: 5px 10px; border-radius: 8px; margin-top: 2px; }
+        .product-qualities { font-size: 0.8rem; color: #555; font-style: italic; margin-bottom: 10px; }
+        .stock-badge { font-size: 0.8rem; font-weight: bold; padding: 4px 12px; border-radius: 10px; margin-top: 5px; display: inline-block; }
+
+        /* Style spécifique Order Modal */
+        .order-modal-header { background: var(--canva-gradient); color: white; border-radius: 30px 30px 0 0; padding: 20px; }
+        .order-summary-table { font-size: 0.85rem; border-radius: 15px; overflow: hidden; }
+        .order-summary-table th { background: #f8f9fa; color: #555; }
+        .order-status-banner { border-radius: 15px; padding: 15px; font-weight: bold; text-align: center; margin-top: 15px; }
+        .order-price-row input { border: none; background: #f0f0f0; border-radius: 5px; width: 60px; text-align: center; font-size: 0.8rem; }
+        .order-price-row .form-check-input { cursor: pointer; width: 1.2em; height: 1.2em; border: 2px solid var(--canva-purple); }
+    </style>
+</head>
+<body>
+
+<header class="app-header shadow-lg pb-4">
+    <nav class="navbar navbar-expand-lg navbar-dark p-3">
+        <div class="container px-0">
+            <div class="d-flex align-items-center gap-2">
+                <img id="navLogo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-logo" alt="">
+                <div>
+                    <h1 class="h6 fw-bold mb-0 text-white" id="navCompanyName">MT & B-One</h1>
+                    <small class="opacity-75" style="font-size: 0.65rem;">Catalogue Officiel</small>
+                </div>
+            </div>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <i class="bi bi-list fs-2"></i>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link" href="index.html"><i class="bi bi-house-door me-1"></i> Accueil</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="produits.html"><i class="bi bi-box-seam me-1"></i> Produits</a></li>
+                    <li class="nav-item"><a class="nav-link" href="panier.html"><i class="bi bi-cart3 me-1"></i> Mon Panier</a></li>
+                    <li class="nav-item"><a class="nav-link" href="paiement.html"><i class="bi bi-credit-card me-1"></i> Paiement</a></li>
+                    <li class="nav-item"><a class="nav-link" href="comptabilite.html"><i class="bi bi-calculator me-1"></i> Comptabilité</a></li>
+                    <li class="nav-item"><a class="nav-link" href="maintenance.html"><i class="bi bi-wrench-adjustable me-1"></i> Maintenance</a></li>
+                    <li class="nav-item"><a class="nav-link" href="configuration.html"><i class="bi bi-gear me-1"></i> Configuration</a></li>
+                    <li class="nav-item border-top mt-2 pt-2 border-white border-opacity-25">
+                        <a class="nav-link text-warning" href="#" id="adminBtnToggle" onclick="Shop.toggleAdmin()">
+                            <i class="bi bi-shield-lock me-1"></i> Afficher Admin
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>
+
+<main class="container px-4">
+    <div class="search-container">
+        <i class="bi bi-search search-icon"></i>
+        <input type="text" id="searchInput" class="form-control search-input" placeholder="Rechercher un produit..." onkeyup="Shop.search()">
+    </div>
+
+    <div class="category-scroll" id="categoryTabs">
+        <div class="cat-badge active" onclick="Shop.filter('Tous', this)">Tous</div>
+    </div>
+
+    <div class="row g-3" id="productGrid"></div>
+
+    <section class="admin-section mb-5" id="adminPanel" style="display: none;">
+        <h2 class="h5 fw-bold mb-4"><i class="bi bi-gear-fill me-2"></i>Gestion Administrative</h2>
+        
+        <ul class="nav nav-tabs mb-3" id="adminTabs" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#adminProds">Produits</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#adminOrders">Historique Commandes</button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="adminProds">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle" style="font-size: 0.85rem;">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Réf</th>
+                                <th>Produit</th>
+                                <th>Stock</th>
+                                <th>Canaux</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminProductTable"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="adminOrders">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle" style="font-size: 0.85rem;">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Client</th>
+                                <th>Produit</th>
+                                <th>Total</th>
+                                <th>Statut</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminOrdersTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<button class="btn-plus-float shadow-lg" onclick="Shop.openAddModal()" title="Ajouter un produit">
+    <i class="bi bi-plus-lg fs-3"></i>
+</button>
+
+<div class="modal fade" id="orderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content shadow-lg border-0">
+            <div class="order-modal-header text-center">
+                <h5 class="fw-bold mb-0 text-uppercase letter-spacing-1">Validation du Projet de Commande</h5>
+            </div>
+            <div class="modal-body p-4">
+                <div class="row g-4">
+                    <div class="col-md-5 text-center border-end">
+                        <img id="orderProdImg" src="" class="img-fluid rounded-3 mb-3" style="max-height: 200px;">
+                        <h6 id="orderProdName" class="fw-bold text-primary"></h6>
+                        <div id="orderProdRef" class="small text-muted mb-2"></div>
+                        <div id="orderProdStockBadge"></div>
+                    </div>
+                    <div class="col-md-7">
+                        <form id="orderForm">
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold">NOM DU CLIENT</label>
+                                    <input type="text" id="orderClientName" class="form-control rounded-pill" placeholder="Ex: Jean Dupont">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold">TÉLÉPHONE</label>
+                                    <input type="tel" id="orderClientPhone" class="form-control rounded-pill" placeholder="Ex: 0102030405">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold text-muted">SÉLECTIONNEZ LE TARIF APPLICABLE</label>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered order-summary-table align-middle">
+                                        <thead>
+                                            <tr class="text-center">
+                                                <th>Canal</th>
+                                                <th>Vente</th>
+                                                <th>Transit</th>
+                                                <th>Douane</th>
+                                                <th>Livr.</th>
+                                                <th>Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="orderPriceTable"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold">QUANTITÉ</label>
+                                    <input type="number" id="orderQty" class="form-control rounded-pill" value="1" min="1" oninput="Shop.calculateOrder()">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold">PRIX UNITAIRE FINAL</label>
+                                    <input type="number" id="orderCustomPrice" class="form-control rounded-pill" placeholder="20000" oninput="Shop.calculateOrder()">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold">MONTANT DU PAIEMENT REÇU</label>
+                                <div class="input-group">
+                                    <input type="number" id="orderPayment" class="form-control rounded-start-pill" placeholder="Saisir le montant versé" oninput="Shop.calculateOrder()">
+                                    <span class="input-group-text rounded-end-pill">F CFA</span>
+                                </div>
+                            </div>
+
+                            <div id="orderTotalDisplay" class="p-3 bg-light rounded-4 mb-3 text-center">
+                                <span class="text-muted small">TOTAL À PAYER :</span>
+                                <h4 class="fw-bold text-dark mb-0" id="valTotal">0 F CFA</h4>
+                            </div>
+
+                            <div id="orderStatusBanner" class="order-status-banner" style="display:none;"></div>
+
+                            <button type="button" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow mt-3" onclick="Shop.validateProject()">
+                                <i class="bi bi-check2-circle me-2"></i>VALIDER LE PROJET
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header border-0 pt-4 px-4">
+                <h5 class="fw-bold"><i class="bi bi-box-seam-fill me-2 text-primary"></i>Configuration Produit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="addProductForm">
+                    <input type="hidden" id="editProductId">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">NOM DU PRODUIT</label>
+                            <input type="text" id="pName" class="form-control rounded-pill" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">CATÉGORIE</label>
+                            <div class="input-group">
+                                <select id="pCat" class="form-select rounded-start-pill" required></select>
+                                <button class="btn btn-primary rounded-end-pill" type="button" onclick="Shop.addNewCategory()"><i class="bi bi-plus-lg"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label class="form-label small fw-bold">QUALITÉS / POINTS FORTS</label>
+                            <textarea id="pQualities" class="form-control rounded-4" rows="2" placeholder="Ex: Autonomie 24h, Étanche IP67, Charge rapide..."></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">STOCK DISPONIBLE</label>
+                            <input type="number" id="pStock" class="form-control rounded-pill" placeholder="0 = Sur commande">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-4">
+                            <label class="form-label small fw-bold">Achat Brut</label>
+                            <input type="number" id="pPriceBuy" class="form-control rounded-pill bg-light">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small fw-bold">Devise</label>
+                            <select id="pCurrency" class="form-select rounded-pill">
+                                <option value="F CFA">F CFA</option>
+                                <option value="€">€</option>
+                                <option value="$">$</option>
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small fw-bold">Pays d'Origine</label>
+                            <div class="input-group">
+                                <select id="pOrigin" class="form-select rounded-start-pill"></select>
+                                <button class="btn btn-outline-secondary rounded-end-pill" type="button" onclick="Shop.addNewOrigin()"><i class="bi bi-plus"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="canal-box">
+                                <h6 class="fw-bold text-primary mb-2"><i class="bi bi-airplane"></i> AVION</h6>
+                                <input type="number" id="pAvionVente" class="form-control form-control-sm mb-1" placeholder="Prix Vente">
+                                <input type="number" id="pAvionTransit" class="form-control form-control-sm mb-1" placeholder="Transit">
+                                <input type="number" id="pAvionDouane" class="form-control form-control-sm mb-1" placeholder="Douane">
+                                <input type="number" id="pAvionLiv" class="form-control form-control-sm" placeholder="Livraison">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="canal-box">
+                                <h6 class="fw-bold text-info mb-2"><i class="bi bi-ship"></i> BATEAU</h6>
+                                <input type="number" id="pBateauVente" class="form-control form-control-sm mb-1" placeholder="Prix Vente">
+                                <input type="number" id="pBateauTransit" class="form-control form-control-sm mb-1" placeholder="Transit">
+                                <input type="number" id="pBateauDouane" class="form-control form-control-sm mb-1" placeholder="Douane">
+                                <input type="number" id="pBateauLiv" class="form-control form-control-sm" placeholder="Livraison">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="canal-box">
+                                <h6 class="fw-bold text-success mb-2"><i class="bi bi-shop"></i> DIRECT (Magasin)</h6>
+                                <input type="number" id="pDirectTTC" class="form-control form-control-sm" placeholder="Prix TTC Final">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3 mt-2">
+                        <label class="form-label small fw-bold">Image</label>
+                        <input type="file" id="pImgFile" class="form-control rounded-pill" accept="image/*">
+                        <input type="hidden" id="pImgBase64">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-3 shadow rounded-pill fw-bold">ENREGISTRER</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg">
+            <div class="modal-body p-0">
+                <div id="captureArea" class="text-center">
+                    <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
+                         <img id="modalBrandLogo" src="" style="height: 40px; width: 40px; object-fit: contain; border-radius: 8px;">
+                         <div class="text-start">
+                             <div class="fw-bold text-dark" style="font-size: 0.9rem;" id="modalCompanyName">MT & B-One</div>
+                             <div class="text-muted" style="font-size: 0.65rem;">Catalogue Officiel</div>
+                         </div>
+                    </div>
+                    <div class="marketing-banner">TARIFICATION PAR CANAL</div>
+                    <img id="modalImg" src="" class="modal-product-img">
+                    <h3 id="modalTitle" class="fw-bold text-dark mb-1"></h3>
+                    <div id="modalQualities" class="product-qualities px-4"></div>
+                    <div id="modalUniqueIdDisplay" class="fw-bold text-primary mb-1" style="font-size: 1.1rem; letter-spacing: 1px;"></div>
+                    <div id="modalStockDisplay" class="mb-2"></div>
+                    <div id="modalOrigin" class="small text-muted mb-2"></div>
+                    <div id="modalPriceList" class="px-3 mb-3"></div>
+                    <div class="order-info">
+                        <div class="row align-items-center">
+                            <div class="col-7 text-start ps-4">
+                                <p class="mb-0 fw-bold" id="modalDisplayCEOName" style="font-size: 0.8rem;">PDG : ...</p>
+                                <p class="mb-0 text-muted" id="modalDisplayCEOPhone" style="font-size: 0.75rem;">...</p>
+                            </div>
+                            <div class="col-5"><img id="modalSignature" src="" class="modal-signature"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 pt-0 text-center">
+                    <input type="hidden" id="currentProductId">
+                    <button class="share-btn-status w-100" onclick="Shop.publishToStatus()"><i class="bi bi-whatsapp me-2"></i>PUBLIER SUR WHATSAPP</button>
+                    <button class="share-btn-img w-100" onclick="Shop.shareProductImg()"><i class="bi bi-image me-2"></i>Télécharger l'affiche</button>
+                    <button class="share-btn-link w-100" onclick="Shop.shareProductLink()"><i class="bi bi-whatsapp me-2"></i>Commander via WhatsApp</button>
+                    <button class="btn-close-modal w-100" data-bs-dismiss="modal"><i class="bi bi-x-circle me-2"></i>FERMER LA FICHE</button>
+                    <button id="modalBtnDelete" class="btn btn-outline-danger w-100 mt-2 border-0" style="display:none;" onclick="Shop.deleteCurrentProduct()">
+                        <i class="bi bi-trash3 me-2"></i>Supprimer définitivement ce produit
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const STORAGE_KEY = 'BONE_OFFICIAL_CONFIG_V2';
+    const DB_KEY = 'BONE_PRODUCTS_LIST';
+    const CAT_KEY = 'BONE_CATEGORIES_LIST';
+    const ORIGIN_KEY = 'BONE_ORIGINS_LIST';
+    const ADMIN_KEY = 'BONE_ADMIN_AUTH';
+    const ORDERS_KEY = 'BONE_ORDERS_HISTORY';
+
+    let products = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+    let categories = JSON.parse(localStorage.getItem(CAT_KEY)) || ['Énergie', 'Audio', 'Mobilité'];
+    let origins = JSON.parse(localStorage.getItem(ORIGIN_KEY)) || ['Chine', 'Dubaï', 'USA', 'Europe'];
+    let orders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
+
+    const Shop = {
+        currentOrderProduct: null,
+        selectedPrices: [],
+
+        init() {
+            this.renderCategories();
+            this.renderOrigins();
+            this.render();
+            this.checkAdminStatus();
+            this.loadBrandConfig();
+        },
+
+        loadBrandConfig() {
+            const config = JSON.parse(localStorage.getItem(STORAGE_KEY));
+            if(config) {
+                if(config.logo) {
+                    document.getElementById('navLogo').src = config.logo;
+                    document.getElementById('modalBrandLogo').src = config.logo;
+                }
+                if(config.companyName) {
+                    document.getElementById('navCompanyName').innerText = config.companyName;
+                    document.getElementById('modalCompanyName').innerText = config.companyName;
+                }
+                if(config.ceoName) document.getElementById('modalDisplayCEOName').innerText = "PDG : " + config.ceoName;
+                if(config.ceoWhatsapp) document.getElementById('modalDisplayCEOPhone').innerText = config.ceoWhatsapp;
+                if(config.sign) document.getElementById('modalSignature').src = config.sign;
+            }
+        },
+
+        checkAdminStatus() {
+            const isAdmin = localStorage.getItem(ADMIN_KEY) === 'true';
+            document.getElementById('adminPanel').style.display = isAdmin ? 'block' : 'none';
+            document.getElementById('modalBtnDelete').style.display = isAdmin ? 'block' : 'none';
+            document.getElementById('adminBtnToggle').innerHTML = isAdmin ? '<i class="bi bi-shield-shaded me-1"></i> Masquer Admin' : '<i class="bi bi-shield-lock me-1"></i> Afficher Admin';
+            if(isAdmin) {
+                this.renderAdminTable();
+                this.renderOrdersTable();
+            }
+            this.renderCategories();
+        },
+
+        toggleAdmin() {
+            const current = localStorage.getItem(ADMIN_KEY);
+            if(current === 'true') {
+                localStorage.setItem(ADMIN_KEY, 'false');
+                this.checkAdminStatus();
+            } else {
+                const pass = prompt("Accès Admin :");
+                if(pass === "1234") { 
+                    localStorage.setItem(ADMIN_KEY, 'true'); 
+                    this.checkAdminStatus(); 
+                } else {
+                    alert("Accès refusé");
+                }
+            }
+        },
+
+        renderCategories() {
+            const tabs = document.getElementById('categoryTabs');
+            const select = document.getElementById('pCat');
+            const isAdmin = localStorage.getItem(ADMIN_KEY) === 'true';
+            
+            tabs.innerHTML = `<div class="cat-badge active" onclick="Shop.filter('Tous', this)">Tous</div>` + 
+                categories.map(c => `
+                    <div class="cat-badge" onclick="Shop.filter('${c}', this)">
+                        ${c}
+                        ${isAdmin ? `<i class="bi bi-x-circle btn-del-cat" onclick="event.stopPropagation(); Shop.deleteCategory('${c}')"></i>` : ''}
+                    </div>`).join('');
+            select.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+        },
+
+        addNewCategory() {
+            const newCat = prompt("Nom de la catégorie :");
+            if(newCat && !categories.includes(newCat)) { categories.push(newCat); localStorage.setItem(CAT_KEY, JSON.stringify(categories)); this.renderCategories(); }
+        },
+
+        deleteCategory(cat) {
+            if(confirm(`Supprimer la catégorie "${cat}" ?`)) {
+                categories = categories.filter(c => c !== cat);
+                localStorage.setItem(CAT_KEY, JSON.stringify(categories));
+                this.renderCategories();
+            }
+        },
+
+        renderOrigins() {
+            const select = document.getElementById('pOrigin');
+            select.innerHTML = origins.map(o => `<option value="${o}">${o}</option>`).join('');
+        },
+
+        addNewOrigin() {
+            const newOri = prompt("Nom du nouveau pays d'origine :");
+            if(newOri && !origins.includes(newOri)) { origins.push(newOri); localStorage.setItem(ORIGIN_KEY, JSON.stringify(origins)); this.renderOrigins(); document.getElementById('pOrigin').value = newOri; }
+        },
+
+        render(items = products) {
+            const grid = document.getElementById('productGrid');
+            grid.innerHTML = items.map(p => {
+                let displayPrice = "N/D";
+                if(p.canaux) {
+                    if(p.canaux.direct?.ttc) displayPrice = p.canaux.direct.ttc.toLocaleString();
+                    else if(p.canaux.avion?.vente) displayPrice = (p.canaux.avion.vente + p.canaux.avion.transit + p.canaux.avion.douane + p.canaux.avion.liv).toLocaleString();
+                }
+                return `
+                <div class="col-6 col-md-4 col-lg-3 mb-3" id="prod-card-${p.id}">
+                    <div class="product-card shadow-sm p-3" onclick="Shop.showDetails(${p.id})">
+                        <div class="img-container mb-2">
+                            <img src="${p.img}" class="product-img" loading="lazy">
+                        </div>
+                        <h3 class="h6 fw-bold text-dark mb-1 text-truncate">${p.name}</h3>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="price-tag">${displayPrice} ${p.currency || 'F CFA'}</span>
+                            <div class="d-flex gap-1">
+                                <button class="btn-cart-prod" onclick="event.stopPropagation(); Shop.openOrderModal(${p.id})"><i class="bi bi-cart-plus"></i></button>
+                                <button class="btn-edit-prod" onclick="event.stopPropagation(); Shop.openEditModal(${p.id})"><i class="bi bi-pencil-square"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        },
+
+        openOrderModal(id) {
+            const p = products.find(x => x.id === id);
+            if(!p) return;
+            this.currentOrderProduct = p;
+            this.selectedPrices = [];
+
+            document.getElementById('orderProdImg').src = p.img;
+            document.getElementById('orderProdName').innerText = p.name;
+            document.getElementById('orderProdRef').innerText = "Réf: " + p.uniqueId;
+            document.getElementById('orderProdStockBadge').innerHTML = p.stock > 0 ? 
+                `<span class="badge bg-success">En Stock (${p.stock})</span>` : 
+                `<span class="badge bg-warning text-dark">Sur Commande (A lancer)</span>`;
+
+            let priceRows = "";
+            if(p.canaux) {
+                if(p.canaux.avion?.vente) {
+                    const c = p.canaux.avion;
+                    const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0);
+                    priceRows += this.generateOrderRow("Avion", c.vente, c.transit, c.douane, c.liv, tot, "avion");
+                }
+                if(p.canaux.bateau?.vente) {
+                    const c = p.canaux.bateau;
+                    const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0);
+                    priceRows += this.generateOrderRow("Bateau", c.vente, c.transit, c.douane, c.liv, tot, "bateau");
+                }
+                if(p.canaux.direct?.ttc) {
+                    priceRows += `
+                    <tr class="order-price-row text-center">
+                        <td><small>Magasin</small></td>
+                        <td colspan="4" class="text-center"><small>Prix Direct Final</small></td>
+                        <td class="fw-bold d-flex align-items-center justify-content-center gap-2">
+                            ${p.canaux.direct.ttc.toLocaleString()}
+                            <input type="checkbox" id="checkPriceDirect" class="form-check-input" onclick="Shop.togglePriceSelection(${p.canaux.direct.ttc}, this)">
+                        </td>
+                    </tr>`;
+                }
+            }
+            document.getElementById('orderPriceTable').innerHTML = priceRows || "<tr><td colspan='6' class='text-center'>Aucun tarif défini</td></tr>";
+            
+            document.getElementById('orderClientName').value = "";
+            document.getElementById('orderClientPhone').value = "";
+            document.getElementById('orderQty').value = 1;
+            document.getElementById('orderCustomPrice').value = "";
+            document.getElementById('orderPayment').value = "";
+            document.getElementById('orderStatusBanner').style.display = "none";
+            this.calculateOrder();
+
+            new bootstrap.Modal(document.getElementById('orderModal')).show();
+        },
+
+        generateOrderRow(label, v, t, d, l, tot, type) {
+            return `
+            <tr class="order-price-row text-center" id="row-${type}">
+                <td class="fw-bold"><small>${label}</small></td>
+                <td><input type="number" value="${v}" readonly> <input type="checkbox" id="checkPrice${type}" class="form-check-input mt-1" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.value), this)"></td>
+                <td><input type="number" value="${t}" readonly> <input type="checkbox" id="checkTransit${type}" class="form-check-input mt-1" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.value), this)"></td>
+                <td><input type="number" value="${d}" readonly> <input type="checkbox" id="checkDouane${type}" class="form-check-input mt-1" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.value), this)"></td>
+                <td><input type="number" value="${l}" readonly> <input type="checkbox" id="checkLivraison${type}" class="form-check-input mt-1" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.value), this)"></td>
+                <td class="fw-bold d-flex align-items-center justify-content-center gap-1">
+                    <span class="tot-span">${tot}</span>
+                    <input type="checkbox" class="form-check-input" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.innerText), this)">
+                </td>
+            </tr>`;
+        },
+
+        togglePriceSelection(price, checkbox) {
+            if(checkbox.checked) {
+                this.selectedPrices.push(price);
+            } else {
+                const index = this.selectedPrices.indexOf(price);
+                if(index > -1) {
+                    this.selectedPrices.splice(index, 1);
+                }
+            }
+            
+            const totalSelected = this.selectedPrices.reduce((sum, val) => sum + val, 0);
+            const qty = parseInt(document.getElementById('orderQty').value) || 1;
+            
+            document.getElementById('orderCustomPrice').value = totalSelected;
+            document.getElementById('orderPayment').value = totalSelected * qty;
+            
+            this.calculateOrder();
+        },
+
+        calculateOrder() {
+            const qty = parseInt(document.getElementById('orderQty').value) || 0;
+            const price = parseInt(document.getElementById('orderCustomPrice').value) || 0;
+            const payed = parseInt(document.getElementById('orderPayment').value) || 0;
+            const total = qty * price;
+            
+            document.getElementById('valTotal').innerText = total.toLocaleString() + " F CFA";
+            
+            const banner = document.getElementById('orderStatusBanner');
+            if(qty > 0 && price > 0) {
+                banner.style.display = "block";
+                const hasStock = (this.currentOrderProduct.stock >= qty);
+                const paymentOk = (payed >= total && total > 0);
+
+                if(paymentOk) {
+                    if(hasStock) {
+                        banner.className = "order-status-banner bg-success-subtle text-success border border-success";
+                        banner.innerHTML = `<i class="bi bi-check-circle-fill"></i> COMMANDE VALIDÉE`;
+                    } else {
+                        banner.className = "order-status-banner bg-info-subtle text-primary border border-primary";
+                        banner.innerHTML = `<i class="bi bi-clock-history"></i> COMMANDE À LANCER (STOCK ÉPUISÉ)`;
+                    }
+                } else {
+                    banner.className = "order-status-banner bg-danger-subtle text-danger border border-danger";
+                    banner.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i> PAIEMENT INCOMPLET`;
+                }
+            } else {
+                banner.style.display = "none";
+            }
+        },
+
+        validateProject() {
+            const currentProduct = this.currentOrderProduct;
+            
+            const isAvion = document.getElementById('row-avion') ? true : false;
+            const isBateau = document.getElementById('row-bateau') ? true : false;
+            const type = isAvion ? 'avion' : (isBateau ? 'bateau' : 'Direct');
+
+            const newOrder = {
+                id: Date.now().toString(),
+                prodId: currentProduct.id,
+                prodName: currentProduct.name,
+                ref: currentProduct.uniqueId,
+                client: document.getElementById('orderClientName').value || 'Client Anonyme',
+                phone: document.getElementById('orderClientPhone').value || '',
+                
+                price: currentProduct.canaux[type.toLowerCase()]?.vente || currentProduct.canaux.direct?.ttc || 0,
+                transit: currentProduct.canaux[type.toLowerCase()]?.transit || 0,
+                douane: currentProduct.canaux[type.toLowerCase()]?.douane || 0,
+                livraison: currentProduct.canaux[type.toLowerCase()]?.liv || 0,
+
+                isPricePayed: document.getElementById(`checkPrice${type}`)?.checked || document.getElementById('checkPriceDirect')?.checked || false,
+                isTransitPayed: document.getElementById(`checkTransit${type}`)?.checked || false,
+                isDouanePayed: document.getElementById(`checkDouane${type}`)?.checked || false,
+                isLivraisonPayed: document.getElementById(`checkLivraison${type}`)?.checked || false,
+
+                qty: parseInt(document.getElementById('orderQty').value) || 1,
+                total: (parseInt(document.getElementById('orderCustomPrice').value) || 0) * (parseInt(document.getElementById('orderQty').value) || 1),
+                status: (currentProduct.stock >= (parseInt(document.getElementById('orderQty').value) || 1)) ? "Validée" : "À Lancer",
+                date: new Date().toLocaleString()
+            };
+
+            orders.push(newOrder);
+            localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+
+            if(newOrder.status === "Validée") {
+                const idx = products.findIndex(x => x.id === currentProduct.id);
+                products[idx].stock -= newOrder.qty;
+                localStorage.setItem(DB_KEY, JSON.stringify(products));
+            }
+
+            alert("Commande enregistrée avec succès !");
+            bootstrap.Modal.getInstance(document.getElementById('orderModal')).hide();
+            this.init();
+        },
+
+        openAddModal() {
+            document.getElementById('editProductId').value = "";
+            document.getElementById('addProductForm').reset();
+            document.getElementById('pImgBase64').value = "";
+            new bootstrap.Modal(document.getElementById('addModal')).show();
+        },
+
+        openEditModal(id) {
+            const p = products.find(x => x.id === id);
+            if(!p) return;
+            document.getElementById('editProductId').value = p.id;
+            document.getElementById('pName').value = p.name;
+            document.getElementById('pCat').value = p.cat;
+            document.getElementById('pQualities').value = p.qualities || "";
+            document.getElementById('pStock').value = p.stock || "";
+            document.getElementById('pPriceBuy').value = p.priceBuy || "";
+            document.getElementById('pCurrency').value = p.currency || "F CFA";
+            document.getElementById('pOrigin').value = p.origin || "";
+            document.getElementById('pImgBase64').value = p.img;
+            if(p.canaux) {
+                document.getElementById('pAvionVente').value = p.canaux.avion?.vente || "";
+                document.getElementById('pAvionTransit').value = p.canaux.avion?.transit || "";
+                document.getElementById('pAvionDouane').value = p.canaux.avion?.douane || "";
+                document.getElementById('pAvionLiv').value = p.canaux.avion?.liv || "";
+                document.getElementById('pBateauVente').value = p.canaux.bateau?.vente || "";
+                document.getElementById('pBateauTransit').value = p.canaux.bateau?.transit || "";
+                document.getElementById('pBateauDouane').value = p.canaux.bateau?.douane || "";
+                document.getElementById('pBateauLiv').value = p.canaux.bateau?.liv || "";
+                document.getElementById('pDirectTTC').value = p.canaux.direct?.ttc || "";
+            }
+            new bootstrap.Modal(document.getElementById('addModal')).show();
+        },
+
+        saveProduct(e) {
+            e.preventDefault();
+            const editId = document.getElementById('editProductId').value;
+            
+            const pData = {
+                id: editId ? parseInt(editId) : Date.now(),
+                uniqueId: editId ? products.find(x => x.id == editId).uniqueId : "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase(),
+                name: document.getElementById('pName').value,
+                cat: document.getElementById('pCat').value,
+                qualities: document.getElementById('pQualities').value,
+                stock: parseInt(document.getElementById('pStock').value) || 0,
+                priceBuy: parseInt(document.getElementById('pPriceBuy').value) || 0,
+                currency: document.getElementById('pCurrency').value,
+                origin: document.getElementById('pOrigin').value,
+                img: document.getElementById('pImgBase64').value || "https://via.placeholder.com/150",
+                canaux: {
+                    avion: { 
+                        vente: parseInt(document.getElementById('pAvionVente').value) || 0, 
+                        transit: parseInt(document.getElementById('pAvionTransit').value) || 0, 
+                        douane: parseInt(document.getElementById('pAvionDouane').value) || 0, 
+                        liv: parseInt(document.getElementById('pAvionLiv').value) || 0 
+                    },
+                    bateau: { 
+                        vente: parseInt(document.getElementById('pBateauVente').value) || 0, 
+                        transit: parseInt(document.getElementById('pBateauTransit').value) || 0, 
+                        douane: parseInt(document.getElementById('pBateauDouane').value) || 0, 
+                        liv: parseInt(document.getElementById('pBateauLiv').value) || 0 
+                    },
+                    direct: { ttc: parseInt(document.getElementById('pDirectTTC').value) || 0 }
+                }
+            };
+            
+            if(editId) { 
+                const idx = products.findIndex(x => x.id == editId); 
+                products[idx] = pData; 
+            } else { 
+                products.push(pData); 
+            }
+            
+            localStorage.setItem(DB_KEY, JSON.stringify(products));
+            bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
+            this.checkAdminStatus();
+            this.render();
+            this.scrollToProduct(pData.id);
+        },
+
+        scrollToProduct(id) {
+            setTimeout(() => {
+                const el = document.getElementById(`prod-card-${id}`);
+                if(el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('highlight-new'); setTimeout(() => el.classList.remove('highlight-new'), 3000); }
+            }, 300);
+        },
+
+        showDetails(id) {
+            const p = products.find(x => x.id === id);
+            if(!p) return;
+            document.getElementById('currentProductId').value = p.id;
+            document.getElementById('modalImg').src = p.img;
+            document.getElementById('modalTitle').innerText = p.name;
+            document.getElementById('modalQualities').innerText = p.qualities || "";
+            document.getElementById('modalUniqueIdDisplay').innerText = p.uniqueId;
+            document.getElementById('modalOrigin').innerText = "Origine : " + (p.origin || 'N/C');
+            
+            const stockDiv = document.getElementById('modalStockDisplay');
+            if(p.stock && p.stock > 0) {
+                stockDiv.innerHTML = `<span class="stock-badge bg-success text-white">📦 STOCK DISPONIBLE : ${p.stock}</span>`;
+            } else {
+                stockDiv.innerHTML = `<span class="stock-badge bg-warning text-dark">⏳ SUR COMMANDE</span>`;
+            }
+
+            let htmlPrices = "";
+            const curr = p.currency || 'F CFA';
+            if(p.canaux) {
+                const c = p.canaux;
+                if(c.avion?.vente) {
+                    const tot = (parseInt(c.avion.vente)||0) + (parseInt(c.avion.transit)||0) + (parseInt(c.avion.douane)||0) + (parseInt(c.avion.liv)||0);
+                    htmlPrices += `<div class="mb-2 p-2 border rounded"><div class="d-flex justify-content-between fw-bold text-primary"><span>✈️ AVION</span><span>${tot.toLocaleString()} ${curr}</span></div><div class="price-detail-box">Base: ${c.avion.vente} | Transit: ${c.avion.transit} | Douane: ${c.avion.douane} | Liv: ${c.avion.liv}</div></div>`;
+                }
+                if(c.bateau?.vente) {
+                    const tot = (parseInt(c.bateau.vente)||0) + (parseInt(c.bateau.transit)||0) + (parseInt(c.bateau.douane)||0) + (parseInt(c.bateau.liv)||0);
+                    htmlPrices += `<div class="mb-2 p-2 border rounded"><div class="d-flex justify-content-between fw-bold text-info"><span>🚢 BATEAU</span><span>${tot.toLocaleString()} ${curr}</span></div><div class="price-detail-box">Base: ${c.bateau.vente} | Transit: ${c.bateau.transit} | Douane: ${c.bateau.douane} | Liv: ${c.bateau.liv}</div></div>`;
+                }
+                if(c.direct?.ttc) {
+                    htmlPrices += `<div class="mb-2 p-2 border rounded bg-light"><div class="d-flex justify-content-between fw-bold text-success"><span>🏠 AU MAGASIN (Direct)</span><span>${c.direct.ttc.toLocaleString()} ${curr}</span></div></div>`;
+                }
+            }
+            document.getElementById('modalPriceList').innerHTML = htmlPrices || "<p class='text-muted'>Aucun prix configuré</p>";
+            
+            this.loadBrandConfig();
+            new bootstrap.Modal(document.getElementById('productModal')).show();
+        },
+
+        getPublishText() {
+            const config = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+            const title = document.getElementById('modalTitle').innerText;
+            const ref = document.getElementById('modalUniqueIdDisplay').innerText;
+            const qualities = document.getElementById('modalQualities').innerText;
+            const p = products.find(x => x.id == document.getElementById('currentProductId').value);
+            
+            const stockTxt = (p && p.stock > 0) ? `✅ Stock : ${p.stock}` : `⏳ Sur commande`;
+            const company = config.companyName || "MT & B-One";
+            const ceo = config.ceoName || "L'Administrateur";
+            const phoneRaw = config.ceoWhatsapp || "";
+            const phoneForLink = phoneRaw.replace(/\s+/g, '').replace('+', '');
+            const curr = p.currency || 'F CFA';
+
+            let priceTxt = "";
+            if(p.canaux) {
+                if(p.canaux.avion?.vente) {
+                    const c = p.canaux.avion;
+                    const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0);
+                    priceTxt += `✈️ *AVION :* ${tot.toLocaleString()} ${curr}\n`;
+                    priceTxt += `   (Vente: ${c.vente} | Trans: ${c.transit} | Doua: ${c.douane} | Livr: ${c.liv})\n`;
+                }
+                if(p.canaux.bateau?.vente) {
+                    const c = p.canaux.bateau;
+                    const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0);
+                    priceTxt += `🚢 *BATEAU :* ${tot.toLocaleString()} ${curr}\n`;
+                    priceTxt += `   (Vente: ${c.vente} | Trans: ${c.transit} | Doua: ${c.douane} | Livr: ${c.liv})\n`;
+                }
+                if(p.canaux.direct?.ttc) {
+                    priceTxt += `🏠 *MAGASIN (Direct) :* ${p.canaux.direct.ttc.toLocaleString()} ${curr}\n`;
+                }
+            }
+            
+            const productOrders = orders.filter(o => o.prodId == p.id);
+            let clientTxt = "";
+            if(productOrders.length > 0) {
+                clientTxt = `\n👥 *RÉSERVATIONS / CLIENTS :*\n`;
+                productOrders.forEach((o, i) => {
+                    clientTxt += `   ${i+1}. ${o.client} (Qté: ${o.qty})\n`;
+                });
+            }
+
+            return `🌟 *DISPONIBILITÉ : ${company}*\n` +
+                        `━━━━━━━━━━━━━━━━━━\n\n` +
+                        `📦 *Produit :* ${title}\n` +
+                        `🔍 *Référence :* ${ref}\n` +
+                        `📊 *État :* ${stockTxt}\n` +
+                        `✨ *Qualités :* ${qualities || 'Qualité Premium'}\n\n` +
+                        `💰 *NOS TARIFS DÉTAILLÉS :*\n${priceTxt}` +
+                        `${clientTxt}\n` +
+                        `🚀 *Meilleurs prix garantis.*\n\n` +
+                        `📲 *Contact :* https://wa.me/${phoneForLink}\n\n` +
+                        `✍️ _Signé : ${ceo}_`;
+        },
+
+        publishToStatus() {
+            const msg = this.getPublishText();
+            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+        },
+
+        shareProductImg() {
+            const p = products.find(x => x.id == document.getElementById('currentProductId').value);
+            if(!p) return;
+            
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Génération...';
+            btn.disabled = true;
+
+            // Copie simultanée du texte
+            const textToCopy = this.getPublishText();
+            navigator.clipboard.writeText(textToCopy).catch(err => {
+                console.error('Erreur lors de la copie du texte: ', err);
+            });
+            
+            const area = document.getElementById('captureArea');
+            setTimeout(() => {
+                html2canvas(area, { useCORS: true, scale: 2 }).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = `Fiche_${p.name}.png`;
+                    link.href = canvas.toDataURL("image/png");
+                    link.click();
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    alert("Affiche générée et texte de publication copié !");
+                });
+            }, 100);
+        },
+
+        shareProductLink() {
+            const config = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+            const title = document.getElementById('modalTitle').innerText;
+            const ref = document.getElementById('modalUniqueIdDisplay').innerText;
+            const company = config.companyName || "MT & B-One";
+            const phoneRaw = config.ceoWhatsapp || "";
+            const phoneForLink = phoneRaw.replace(/\s+/g, '').replace('+', '');
+            
+            const p = products.find(x => x.id == document.getElementById('currentProductId').value);
+            const curr = p.currency || 'F CFA';
+            
+            let priceLines = "";
+            if(p.canaux) {
+                if(p.canaux.direct?.ttc) {
+                    priceLines = `💰 *Prix indiqué :* ${p.canaux.direct.ttc.toLocaleString()} ${curr}`;
+                } else if(p.canaux.avion?.vente) {
+                    const c = p.canaux.avion;
+                    const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0);
+                    priceLines = `💰 *Prix vente :* ${c.vente.toLocaleString()} ${curr}\n` +
+                                 `🚢 *Transit :* ${c.transit.toLocaleString()} ${curr}\n` +
+                                 `🛃 *Douane :* ${c.douane.toLocaleString()} ${curr}\n` +
+                                 `🚚 *Livraison :* ${c.liv.toLocaleString()} ${curr}\n` +
+                                 `💵 *Total :* ${tot.toLocaleString()} ${curr}`;
+                }
+            }
+
+            const msg = `*DEMANDE DE COMMANDE - ${company}*\n\n` +
+                        `Bonjour, je souhaiterais passer une commande pour le produit suivant :\n\n` +
+                        `📦 *Produit :* ${title}\n` +
+                        `🔍 *Référence :* ${ref}\n` +
+                        `${priceLines}\n\n` +
+                        `Pourriez-vous m'indiquer la marche à suivre ? Merci d'avance.`;
+            
+            window.open(`https://wa.me/${phoneForLink}?text=${encodeURIComponent(msg)}`, '_blank');
+        },
+
+        deleteCurrentProduct() {
+            const id = parseInt(document.getElementById('currentProductId').value);
+            if(confirm("Supprimer définitivement ce produit ?")) {
+                products = products.filter(p => p.id !== id);
+                localStorage.setItem(DB_KEY, JSON.stringify(products));
+                bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
+                this.init();
+            }
+        },
+
+        renderAdminTable() {
+            const tbody = document.getElementById('adminProductTable');
+            tbody.innerHTML = products.map(p => `
+                <tr>
+                    <td><code class="small">${p.uniqueId}</code></td>
+                    <td><b>${p.name}</b></td>
+                    <td><span class="badge ${p.stock > 0 ? 'bg-success' : 'bg-secondary'}">${p.stock || 0}</span></td>
+                    <td>${p.canaux?.avion?.vente ? '✈️' : ''} ${p.canaux?.bateau?.vente ? '🚢' : ''} ${p.canaux?.direct?.ttc ? '🏠' : ''}</td>
+                    <td class="text-end">
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" onclick="Shop.duplicateProduct(${p.id})"><i class="bi bi-copy"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="Shop.deleteProduct(${p.id})"><i class="bi bi-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        },
+
+        renderOrdersTable() {
+            const tbody = document.getElementById('adminOrdersTable');
+            if(!tbody) return;
+            tbody.innerHTML = orders.map(o => `
+                <tr>
+                    <td><small>${o.date}</small></td>
+                    <td><b>${o.client}</b><br><small>${o.phone}</small></td>
+                    <td>${o.prodName}<br><code class="small">${o.ref}</code> (x${o.qty})</td>
+                    <td class="fw-bold">${o.total.toLocaleString()}</td>
+                    <td><span class="badge ${o.status === 'Validée' ? 'bg-success' : 'bg-info'}">${o.status}</span></td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-danger" onclick="Shop.deleteOrder(${o.id})"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>
+            `).reverse().join('');
+        },
+
+        deleteOrder(id) {
+            if(confirm("Supprimer cette commande de l'historique ?")) {
+                orders = orders.filter(o => o.id !== id);
+                localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+                this.renderOrdersTable();
+            }
+        },
+
+        duplicateProduct(id) {
+            const p = products.find(x => x.id === id);
+            if(!p) return;
+            const clone = JSON.parse(JSON.stringify(p));
+            clone.id = Date.now();
+            clone.uniqueId = "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase();
+            clone.name += " (Copie)";
+            products.push(clone);
+            localStorage.setItem(DB_KEY, JSON.stringify(products));
+            this.init();
+            this.scrollToProduct(clone.id);
+        },
+
+        deleteProduct(id) {
+            if(confirm("Supprimer ce produit ?")) { 
+                products = products.filter(p => p.id !== id); 
+                localStorage.setItem(DB_KEY, JSON.stringify(products)); 
+                this.init(); 
+            }
+        },
+
+        search() { const q = document.getElementById('searchInput').value.toLowerCase(); this.render(products.filter(p => p.name.toLowerCase().includes(q))); },
+
+        filter(cat, el) {
+            document.querySelectorAll('.cat-badge').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            this.render(cat === 'Tous' ? products : products.filter(p => p.cat === cat));
+        }
+    };
+
+    document.getElementById('pImgFile').onchange = function(e) {
+        const reader = new FileReader();
+        reader.onload = function() { document.getElementById('pImgBase64').value = reader.result; };
+        if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
+    };
+
+    document.getElementById('addProductForm').onsubmit = (e) => Shop.saveProduct(e);
+
+    window.onload = () => {
+        Shop.init();
+    };
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('Service Worker enregistré !', reg))
+                .catch(err => console.log('Erreur SW:', err));
+        });
+    }
+</script>
+
+</body>
+</html>

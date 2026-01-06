@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>B-one | Suivi paiement</title>
+    
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#7d2ae8">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="B-one Paiement">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <style>
+        :root { 
+            --canva-purple: #7d2ae8; 
+            --canva-blue: #00c4cc; 
+            --canva-gradient: linear-gradient(135deg, #7d2ae8 0%, #00c4cc 100%);
+        }
+        
+        /* Adaptation plein écran */
+        html, body { height: 100%; margin: 0; padding: 0; overflow-x: hidden; }
+        body { background-color: #f4f7f6; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; }
+        
+        /* Header & Navbar */
+        .app-header { background: var(--canva-gradient); color: white; padding: 0.5rem 0; flex-shrink: 0; }
+        .header-logo { height: 45px; width: 45px; object-fit: contain; border-radius: 10px; background: rgba(255,255,255,0.2); padding: 3px; }
+        
+        .navbar-dark .navbar-nav .nav-link { color: rgba(255,255,255,0.9) !important; font-weight: 500; font-size: 0.9rem; }
+        .navbar-toggler { border: none; padding: 0; }
+        .navbar-toggler:focus { box-shadow: none; }
+
+        /* Contenu principal adaptatif */
+        main { flex: 1 0 auto; width: 100%; max-width: 100%; }
+
+        /* Barre de Recherche */
+        .search-container { margin-top: -25px; position: relative; z-index: 10; width: 100%; }
+        .search-input { 
+            border-radius: 30px; border: none; padding: 15px 25px 15px 50px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); font-size: 1rem; width: 100%;
+        }
+        .search-icon { position: absolute; left: 20px; top: 15px; color: #888; font-size: 1.2rem; }
+
+        /* Filtres Catégories */
+        .category-scroll { display: flex; overflow-x: auto; gap: 10px; padding: 15px 0; scrollbar-width: none; }
+        .category-scroll::-webkit-scrollbar { display: none; }
+        .cat-badge { 
+            white-space: nowrap; padding: 8px 20px; border-radius: 20px; 
+            background: white; color: #555; font-weight: 600; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid transparent;
+        }
+        .cat-badge.active { background: var(--canva-purple); color: white; }
+
+        /* Grille Produits (Masquée structurellement) */
+        #productGrid { display: none; }
+
+        /* Modal Raffinée & Formulaire */
+        .modal-content { border-radius: 30px; border: none; overflow: hidden; }
+        .modal-header-img { background: #f8f9fa; padding: 20px; text-align: center; }
+        .modal-product-img-lg { max-height: 150px; object-fit: contain; }
+        .form-label { font-weight: 600; color: #555; font-size: 0.85rem; }
+        .form-control, .form-select { border-radius: 12px; border: 1px solid #eee; padding: 10px 15px; }
+        .form-control:focus { border-color: var(--canva-purple); box-shadow: none; }
+        .readonly-info { background-color: #f8f9fa; border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; font-size: 0.9rem; border: 1px solid #eee; }
+
+        .btn-validate-order { 
+            background: var(--canva-gradient); color: white; border: none; 
+            border-radius: 15px; padding: 12px; font-weight: 700; width: 100%;
+            margin-top: 10px; box-shadow: 0 5px 15px rgba(125, 42, 232, 0.3);
+        }
+
+        /* Section Mes Commandes */
+        .orders-section { background: white; border-radius: 25px; padding: 25px; margin-top: 40px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); margin-bottom: 30px; }
+        .clickable-order-row { cursor: pointer; transition: background 0.2s; border-bottom: 1px solid #f0f0f0; }
+        .clickable-order-row:hover { background-color: #f8f9fa; }
+
+        /* Publication Styles */
+        .publish-header { border-bottom: 3px double #7d2ae8; padding-bottom: 10px; margin-bottom: 20px; }
+        .publish-item { border-left: 4px solid #00c4cc; padding-left: 15px; margin-bottom: 15px; }
+        .signature-area { margin-top: 30px; font-style: italic; border-top: 1px solid #eee; padding-top: 10px; }
+    </style>
+</head>
+<body>
+
+<header class="app-header shadow-lg">
+    <nav class="navbar navbar-expand-lg navbar-dark container">
+        <div class="container-fluid px-0">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                <img id="navLogo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-logo" alt="">
+                <div>
+                    <h1 class="h6 fw-bold mb-0 text-white" id="navCompanyName">B-one</h1>
+                    <small class="opacity-75" style="font-size: 0.65rem;">Suivi paiement</small>
+                </div>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
+                    <li class="nav-item"><a class="nav-link" href="produits.html">Produits</a></li>
+                    <li class="nav-item"><a class="nav-link" href="panier.html">Panier</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="paiement.html">Suivi Paiements</a></li>
+                    <li class="nav-item"><a class="nav-link" href="comptabilite.html">Comptabilité</a></li>
+                    <li class="nav-item"><a class="nav-link" href="configuration.html">Configuration</a></li>
+                    <li class="nav-item"><a class="nav-link" href="maintenance.html">Maintenance</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>
+
+<main class="container px-4">
+    <div class="search-container">
+        <i class="bi bi-search search-icon"></i>
+        <input type="text" id="orderSearchInput" class="form-control search-input" placeholder="Rechercher une commande par nom ou produit..." onkeyup="Shop.renderOrders()">
+    </div>
+
+    <div id="productGrid"></div>
+
+    <section class="orders-section" id="customerOrdersSection">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <h2 class="h5 fw-bold mb-0"><i class="bi bi-wallet2 text-primary me-2"></i>Tableau de Bord des Paiements</h2>
+            <button class="btn btn-dark rounded-pill px-4 fw-bold shadow-sm" onclick="Shop.openPublishModal()">
+                <i class="bi bi-send-fill me-2 text-info"></i>PUBLIER COMMANDE
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead class="table-light small">
+                    <tr>
+                        <th>Date</th>
+                        <th>Client & Produit</th>
+                        <th class="text-end">Reste à Payer</th>
+                    </tr>
+                </thead>
+                <tbody id="customerOrdersTable" class="small"></tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<div class="modal fade" id="orderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+        <div class="modal-content shadow-lg">
+            <div class="modal-header-img">
+                <button type="button" class="btn-close float-end" data-bs-dismiss="modal"></button>
+                <img id="orderModalImg" src="" class="modal-product-img-lg mt-3">
+                <div class="mt-2">
+                    <h4 class="fw-bold text-dark mb-0" id="orderModalTitle"></h4>
+                    <small id="displayClientName" class="text-muted"></small>
+                </div>
+            </div>
+            <div class="modal-body p-4">
+                <form id="directOrderForm">
+                    <input type="hidden" id="editOrderId">
+                    <div class="mb-3">
+                        <label class="form-label text-primary">Prix de Base (Dû: <span id="valBase">0</span>)</label>
+                        <input type="number" id="paidBase" class="form-control" placeholder="Montant payé sur la base" oninput="Shop.updateTotalDisplay()">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-primary">Frais de Transit (Dû: <span id="valTransit">0</span>)</label>
+                        <input type="number" id="paidTransit" class="form-control" placeholder="Montant payé sur transit" oninput="Shop.updateTotalDisplay()">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-primary">Frais de Douane (Dû: <span id="valDouane">0</span>)</label>
+                        <input type="number" id="paidDouane" class="form-control" placeholder="Montant payé sur douane" oninput="Shop.updateTotalDisplay()">
+                    </div>
+                    <div class="p-3 bg-light rounded-3 mb-3 border border-danger text-center">
+                        <small class="text-muted d-block mb-1">RESTE À PAYER</small>
+                        <span class="h4 fw-bold text-danger" id="orderTotalDisplay">0 F CFA</span>
+                    </div>
+                    <button type="button" class="btn-validate-order" onclick="Shop.submitDirectOrder()">
+                        <i class="bi bi-save me-2"></i>Enregistrer le Paiement
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="publishModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg modal-fullscreen-sm-down">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-dark text-white p-4">
+                <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-text me-2"></i>BULLETIN OFFICIEL DES COMMANDES</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 p-md-5 bg-white" id="publishContent">
+                <div class="publish-header text-center">
+                    <h2 class="h4 fw-bold text-uppercase" id="pubCompanyName">B-ONE GROUP</h2>
+                    <p class="text-muted small mb-0">Rapport de Situation des Commandes en Cours</p>
+                    <small class="text-muted" id="pubDate"></small>
+                </div>
+                
+                <div id="publishOrdersList"></div>
+
+                <div class="signature-area text-end">
+                    <p class="mb-0 fw-bold">Le Président Directeur Général,</p>
+                    <p class="text-primary fw-bold" id="pubCEO">Atizoun Plateny AMOUSSOU</p>
+                    <small class="text-muted">Signé numériquement</small>
+                </div>
+            </div>
+            <div class="modal-footer bg-light p-3">
+                <button class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Fermer</button>
+                <button class="btn btn-success rounded-pill px-4 shadow" onclick="Shop.copyAndShareWhatsApp()">
+                    <i class="bi bi-whatsapp me-2"></i>Copier et Partager
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const STORAGE_KEY = 'BONE_OFFICIAL_CONFIG_V2';
+    const DB_KEY = 'BONE_PRODUCTS_LIST';
+    const ORDERS_KEY = 'BONE_USER_ORDERS';
+
+    let products = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+    let userOrders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
+    let selectedOrder = null;
+    let orderModalObj = null;
+    let publishModalObj = null;
+
+    const Shop = {
+        init() {
+            orderModalObj = new bootstrap.Modal(document.getElementById('orderModal'));
+            publishModalObj = new bootstrap.Modal(document.getElementById('publishModal'));
+            this.renderOrders();
+            this.loadBranding();
+        },
+
+        loadBranding() {
+            const config = JSON.parse(localStorage.getItem(STORAGE_KEY));
+            if(config) {
+                if(config.logo) document.getElementById('navLogo').src = config.logo;
+                if(config.companyName) {
+                    document.getElementById('navCompanyName').innerText = config.companyName;
+                    document.getElementById('pubCompanyName').innerText = config.companyName;
+                }
+            }
+        },
+
+        renderOrders() {
+            const query = document.getElementById('orderSearchInput').value.toLowerCase();
+            const table = document.getElementById('customerOrdersTable');
+            const filteredOrders = userOrders.filter(o => 
+                (o.productName && o.productName.toLowerCase().includes(query)) || 
+                (o.customerName && o.customerName.toLowerCase().includes(query))
+            );
+            
+            if (filteredOrders.length === 0) {
+                table.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-4">Aucune commande enregistrée.</td></tr>`;
+                return;
+            }
+            
+            table.innerHTML = filteredOrders.map((o, idx) => {
+                const totalDu = (parseFloat(o.priceBase) || 0) + (parseFloat(o.transit) || 0) + (parseFloat(o.douane) || 0);
+                const totalPaye = (parseFloat(o.paidBase) || 0) + (parseFloat(o.paidTransit) || 0) + (parseFloat(o.paidDouane) || 0);
+                const reste = totalDu - totalPaye;
+                return `
+                <tr class="clickable-order-row" onclick="Shop.editOrder(${userOrders.indexOf(o)})">
+                    <td><span class="text-muted">${o.date || '-'}</span></td>
+                    <td>
+                        <div class="fw-bold text-dark">${o.customerName || 'Client inconnu'}</div>
+                        <div class="text-muted" style="font-size: 0.75rem;">${o.productName || 'Produit'}</div>
+                    </td>
+                    <td class="text-end fw-bold text-danger">${reste.toLocaleString()} ${o.currency || 'F CFA'}</td>
+                </tr>`;
+            }).join('');
+        },
+
+        editOrder(index) {
+            selectedOrder = userOrders[index];
+            const p = products.find(prod => prod.id === selectedOrder.productId) || {};
+            document.getElementById('editOrderId').value = index;
+            document.getElementById('orderModalImg').src = p.img || '';
+            document.getElementById('orderModalTitle').innerText = selectedOrder.productName || 'Produit';
+            document.getElementById('displayClientName').innerText = `Client: ${selectedOrder.customerName || 'Inconnu'}`;
+            
+            document.getElementById('valBase').innerText = (parseFloat(selectedOrder.priceBase) || 0).toLocaleString();
+            document.getElementById('valTransit').innerText = (parseFloat(selectedOrder.transit) || 0).toLocaleString();
+            document.getElementById('valDouane').innerText = (parseFloat(selectedOrder.douane) || 0).toLocaleString();
+            
+            document.getElementById('paidBase').value = selectedOrder.paidBase || 0;
+            document.getElementById('paidTransit').value = selectedOrder.paidTransit || 0;
+            document.getElementById('paidDouane').value = selectedOrder.paidDouane || 0;
+            
+            this.updateTotalDisplay();
+            orderModalObj.show();
+        },
+
+        updateTotalDisplay() {
+            if(!selectedOrder) return;
+            const totalDu = (parseFloat(selectedOrder.priceBase) || 0) + (parseFloat(selectedOrder.transit) || 0) + (parseFloat(selectedOrder.douane) || 0);
+            const pBase = parseFloat(document.getElementById('paidBase').value) || 0;
+            const pTransit = parseFloat(document.getElementById('paidTransit').value) || 0;
+            const pDouane = parseFloat(document.getElementById('paidDouane').value) || 0;
+            const totalPaye = pBase + pTransit + pDouane;
+            const reste = totalDu - totalPaye;
+            document.getElementById('orderTotalDisplay').innerText = `${reste.toLocaleString()} ${selectedOrder.currency || 'F CFA'}`;
+        },
+
+        submitDirectOrder() {
+            const index = document.getElementById('editOrderId').value;
+            if(index === "") return;
+            
+            userOrders[index].paidBase = parseFloat(document.getElementById('paidBase').value) || 0;
+            userOrders[index].paidTransit = parseFloat(document.getElementById('paidTransit').value) || 0;
+            userOrders[index].paidDouane = parseFloat(document.getElementById('paidDouane').value) || 0;
+            
+            localStorage.setItem(ORDERS_KEY, JSON.stringify(userOrders));
+            orderModalObj.hide();
+            this.renderOrders();
+            alert("Paiement enregistré avec succès.");
+        },
+
+        openPublishModal() {
+            document.getElementById('pubDate').innerText = `Date : ${new Date().toLocaleDateString('fr-FR', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}`;
+            const container = document.getElementById('publishOrdersList');
+            
+            if(userOrders.length === 0) {
+                container.innerHTML = `<p class="text-center py-4">Aucune donnée à publier.</p>`;
+            } else {
+                container.innerHTML = userOrders.map(o => {
+                    const totalDu = (parseFloat(o.priceBase) || 0) + (parseFloat(o.transit) || 0) + (parseFloat(o.douane) || 0);
+                    const totalPaye = (parseFloat(o.paidBase) || 0) + (parseFloat(o.paidTransit) || 0) + (parseFloat(o.paidDouane) || 0);
+                    const reste = totalDu - totalPaye;
+                    return `
+                    <div class="publish-item">
+                        <h6 class="fw-bold mb-1">${o.customerName} - ${o.productName}</h6>
+                        <div class="small">
+                            <span class="text-muted">Prix Base:</span> ${(parseFloat(o.paidBase)||0).toLocaleString()} / ${(parseFloat(o.priceBase)||0).toLocaleString()} ${o.currency}<br>
+                            <span class="text-muted">Transit:</span> ${(parseFloat(o.paidTransit)||0).toLocaleString()} / ${(parseFloat(o.transit)||0).toLocaleString()} ${o.currency}<br>
+                            <span class="text-muted">Douane:</span> ${(parseFloat(o.paidDouane)||0).toLocaleString()} / ${(parseFloat(o.douane)||0).toLocaleString()} ${o.currency}<br>
+                            <span class="text-danger fw-bold">RESTE TOTAL : ${reste.toLocaleString()} ${o.currency}</span>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+            publishModalObj.show();
+        },
+
+        copyAndShareWhatsApp() {
+            if(userOrders.length === 0) return alert("Rien à partager.");
+            
+            const company = document.getElementById('pubCompanyName').innerText;
+            const dateStr = document.getElementById('pubDate').innerText;
+            const ceo = document.getElementById('pubCEO').innerText;
+            
+            let text = `📢 *${company} - BULLETIN OFFICIEL*\n`;
+            text += `📅 _${dateStr}_\n\n`;
+            text += `*SITUATION FINANCIÈRE DES COMMANDES :*\n`;
+            text += `-----------------------------------\n\n`;
+
+            userOrders.forEach(o => {
+                const totalDu = (parseFloat(o.priceBase) || 0) + (parseFloat(o.transit) || 0) + (parseFloat(o.douane) || 0);
+                const totalPaye = (parseFloat(o.paidBase) || 0) + (parseFloat(o.paidTransit) || 0) + (parseFloat(o.paidDouane) || 0);
+                const reste = totalDu - totalPaye;
+                
+                text += `👤 *Client :* ${o.customerName}\n`;
+                text += `📦 *Produit :* ${o.productName}\n`;
+                text += `💵 *Prix Base :* ${(parseFloat(o.paidBase)||0).toLocaleString()} / ${(parseFloat(o.priceBase)||0).toLocaleString()} ${o.currency}\n`;
+                text += `🚚 *Transit :* ${(parseFloat(o.paidTransit)||0).toLocaleString()} / ${(parseFloat(o.transit)||0).toLocaleString()} ${o.currency}\n`;
+                text += `🛂 *Douane :* ${(parseFloat(o.paidDouane)||0).toLocaleString()} / ${(parseFloat(o.douane)||0).toLocaleString()} ${o.currency}\n`;
+                text += `❌ *RESTE À PAYER :* ${reste.toLocaleString()} ${o.currency}\n`;
+                text += `-----------------------------------\n\n`;
+            });
+
+            text += `\n✍️ *Signé :*\n*${ceo}*\n_Président Directeur Général_`;
+
+            navigator.clipboard.writeText(text).then(() => {
+                alert("Rapport copié ! Redirection vers WhatsApp...");
+                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+            });
+        }
+    };
+
+    window.onload = () => Shop.init();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(registration => {
+                    console.log('Service Worker enregistré avec succès:', registration.scope);
+                })
+                .catch(error => {
+                    console.error('L\'enregistrement du Service Worker a échoué:', error);
+                });
+        });
+    }
+</script>
+</body>
+</html>
