@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B-one | Connexion</title>
+    
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#7d2ae8">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root { 
+            --canva-purple: #7d2ae8; 
+            --canva-gradient: linear-gradient(135deg, #7d2ae8 0%, #00c4cc 100%);
+        }
+        body { 
+            background: #f4f7f6; 
+            height: 100vh; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+        }
+        .login-card {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+            z-index: 2;
+        }
+        .btn-primary { background: var(--canva-gradient); border: none; border-radius: 10px; padding: 12px; }
+        .form-control { border-radius: 10px; padding: 12px; }
+        .admin-section { border-top: 1px dashed #ccc; margin-top: 20px; padding-top: 20px; max-height: 300px; overflow-y: auto; }
+        .hidden { display: none; }
+
+        /* Animation de succès */
+        .success-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 1000; display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
+        .success-icon {
+            font-size: 5rem; color: #28a745;
+            animation: scaleUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .success-text { font-weight: bold; color: #333; margin-top: 15px; font-size: 1.2rem; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scaleUp { from { transform: scale(0); } to { transform: scale(1); } }
+        
+        /* Styles additionnels pour la gestion */
+        .user-item { border-bottom: 1px solid #eee; padding: 5px 0; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+
+<div id="successOverlay" class="success-overlay">
+    <i class="bi bi-check-circle-fill success-icon"></i>
+    <div class="success-text" id="successMsg">Connexion réussie !</div>
+    <div class="spinner-border text-primary mt-3" role="status"></div>
+</div>
+
+<div class="login-card">
+    <div class="text-center mb-4">
+        <h2 class="fw-bold" style="color: var(--canva-purple);">B-ONE</h2>
+        <p class="text-muted small">Système de Gestion Sécurisé</p>
+    </div>
+
+    <form id="loginForm">
+        <div class="mb-3">
+            <label class="form-label small fw-bold">Rôle</label>
+            <select class="form-select" id="userRole" required>
+                <option value="PDG">Président Directeur Général (PDG)</option>
+                <optgroup label="Collaborateurs" id="userListOptions">
+                </optgroup>
+            </select>
+        </div>
+        <div class="mb-4">
+            <label class="form-label small fw-bold">Mot de passe</label>
+            <input type="password" class="form-control" id="password" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 fw-bold" id="btnLogin">Se connecter</button>
+    </form>
+
+    <div id="loginError" class="alert alert-danger mt-3 small hidden">Mot de passe incorrect.</div>
+
+    <div class="text-center mt-3">
+        <button class="btn btn-link btn-sm text-decoration-none" onclick="toggleAdminPanel()">
+            <i class="bi bi-gear-fill"></i> Gestion des utilisateurs
+        </button>
+    </div>
+
+    <div id="adminPanel" class="admin-section hidden">
+        <h6 class="fw-bold mb-3 small">Configuration Requise : Admin</h6>
+        <div id="adminAuth">
+            <input type="password" id="adminConfirmPass" class="form-control form-control-sm mb-2" placeholder="Mot de passe PDG pour déverrouiller">
+            <button class="btn btn-dark btn-sm w-100" onclick="unlockUserManagement()">Déverrouiller</button>
+        </div>
+        
+        <div id="userEditor" class="hidden">
+            <div class="bg-light p-2 rounded mb-3">
+                <input type="text" id="newUserName" class="form-control form-control-sm mb-2" placeholder="Nom (ex: Utilisateur 1)">
+                <input type="password" id="newUserPass" class="form-control form-control-sm mb-2" placeholder="Nouveau mot de passe">
+                <button class="btn btn-success btn-sm w-100" onclick="saveUser()">Enregistrer / Modifier</button>
+            </div>
+            <div id="usersListManage" class="mt-2">
+                </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Logique PWA : Enregistrement du Service Worker
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('PWA: Service Worker enregistré !'))
+                .catch(err => console.log('PWA: Erreur SW:', err));
+        });
+    }
+
+    // Configuration initiale
+    const USERS_DB_KEY = 'BONE_USERS_ACCOUNTS';
+    const SESSION_KEY = 'BONE_USER_SESSION';
+
+    // Données par défaut
+    const defaultUsers = {
+        "PDG": { password: "Admin2025", role: "admin" }
+    };
+    for(let i=1; i<=10; i++) {
+        defaultUsers[`Utilisateur ${i}`] = { password: `UserB10${i}`, role: 'user' };
+    }
+
+    let users = JSON.parse(localStorage.getItem(USERS_DB_KEY)) || defaultUsers;
+
+    function init() {
+        const select = document.getElementById('userListOptions');
+        const manageList = document.getElementById('usersListManage');
+        select.innerHTML = '';
+        manageList.innerHTML = '<p class="fw-bold small border-bottom pb-1">Liste des accès :</p>';
+
+        Object.keys(users).forEach(name => {
+            // Remplissage du select de login
+            if(name !== 'PDG') {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                select.appendChild(opt);
+            }
+
+            // Remplissage de la liste de gestion (Admin)
+            const item = document.createElement('div');
+            item.className = 'user-item';
+            item.innerHTML = `
+                <span>${name}</span>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary py-0" onclick="editUser('${name}')" title="Modifier"><i class="bi bi-pencil"></i></button>
+                    ${name !== 'PDG' ? `<button class="btn btn-sm btn-outline-danger py-0" onclick="deleteUser('${name}')" title="Supprimer"><i class="bi bi-trash"></i></button>` : ''}
+                </div>
+            `;
+            manageList.appendChild(item);
+        });
+    }
+
+    // Gestion du Login
+    document.getElementById('loginForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const role = document.getElementById('userRole').value;
+        const pass = document.getElementById('password').value;
+        const error = document.getElementById('loginError');
+        const overlay = document.getElementById('successOverlay');
+        const successMsg = document.getElementById('successMsg');
+
+        if (users[role] && users[role].password === pass) {
+            const sessionData = {
+                name: role,
+                role: users[role].role,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+            
+            successMsg.innerText = `Bienvenue, ${role}`;
+            overlay.style.display = 'flex';
+
+            setTimeout(() => {
+                if (users[role].role === 'admin') {
+                    window.location.href = 'index.html';
+                } else {
+                    window.location.href = 'produits.html';
+                }
+            }, 1500);
+
+        } else {
+            error.classList.remove('hidden');
+            setTimeout(() => error.classList.add('hidden'), 3000);
+        }
+    });
+
+    // Fonctions Administrateur
+    function toggleAdminPanel() {
+        const panel = document.getElementById('adminPanel');
+        panel.classList.toggle('hidden');
+    }
+
+    function unlockUserManagement() {
+        const pass = document.getElementById('adminConfirmPass').value;
+        if(pass === users["PDG"].password) {
+            document.getElementById('adminAuth').classList.add('hidden');
+            document.getElementById('userEditor').classList.remove('hidden');
+        } else {
+            alert("Accès refusé : Seul le PDG peut modifier les utilisateurs.");
+        }
+    }
+
+    function saveUser() {
+        const name = document.getElementById('newUserName').value.trim();
+        const pass = document.getElementById('newUserPass').value;
+
+        if(!name || !pass) return alert("Veuillez remplir tous les champs");
+
+        // On garde le rôle 'admin' si on modifie le PDG, sinon 'user'
+        const role = (users[name] && users[name].role === 'admin') ? 'admin' : 'user';
+        
+        users[name] = { password: pass, role: role };
+        localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
+        
+        alert(`Utilisateur ${name} enregistré/modifié avec succès !`);
+        document.getElementById('newUserName').value = '';
+        document.getElementById('newUserPass').value = '';
+        init();
+    }
+
+    function editUser(name) {
+        document.getElementById('newUserName').value = name;
+        document.getElementById('newUserPass').value = users[name].password;
+        document.getElementById('newUserName').focus();
+    }
+
+    function deleteUser(name) {
+        if(confirm(`Voulez-vous vraiment supprimer l'accès de ${name} ?`)) {
+            delete users[name];
+            localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
+            init();
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem(SESSION_KEY);
+        window.location.href = 'login.html';
+    }
+
+    window.onload = init;
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

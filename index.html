@@ -6,13 +6,30 @@
     <title>B-one | Accueil</title>
     
     <link rel="manifest" href="./manifest.json">
-    <meta name="theme-color" content="#7d2ae8">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="B-one">
-    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
 
+    <script>
+        // --- LOGIQUE DE SESSION & DROITS ADMIN (LocalStorage) ---
+        const AUTH_KEY = 'BONE_USER_SESSION';
+        const sessionData = JSON.parse(localStorage.getItem(AUTH_KEY));
+
+        // Vérification de connexion
+        if (!sessionData) {
+            window.location.href = 'login.html';
+        }
+
+        // Définition des droits : si le rôle dans la session est 'admin'
+        const isAdmin = sessionData && sessionData.role === 'admin';
+
+        function logout() {
+            localStorage.removeItem(AUTH_KEY);
+            window.location.href = 'login.html';
+        }
+    </script>
+
+    <meta name="theme-color" content="#7d2ae8">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -92,6 +109,37 @@
         .chart-container { height: 250px; position: relative; }
 
         .promoter-footer { text-align: center; padding: 20px; color: #aaa; font-size: 0.8rem; }
+
+        /* Style Admin & Déconnexion */
+        .admin-badge { background: #ffc107; color: #000; font-size: 0.6rem; padding: 2px 6px; border-radius: 5px; vertical-align: middle; margin-left: 5px; font-weight: bold; }
+        .nav-logout { color: #ffeb3b !important; font-weight: bold !important; cursor: pointer; }
+
+        /* --- STYLE BOUTON INSTALLATION FLOTTANT --- */
+        .pwa-install-fab {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            z-index: 9999;
+            display: none; /* Géré par pwa-setup.js */
+            align-items: center;
+            gap: 10px;
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 50px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            font-family: 'Segoe UI', sans-serif;
+            font-weight: bold;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+        .pwa-install-fab:hover { transform: scale(1.05); background-color: #34495e; }
+        .pwa-install-fab:active { transform: scale(0.95); }
+        @media (max-width: 600px) {
+            .pwa-install-fab span { display: none; }
+            .pwa-install-fab { padding: 15px; border-radius: 50%; }
+        }
     </style>
 </head>
 <body>
@@ -102,7 +150,7 @@
             <div class="d-flex align-items-center gap-3">
                 <img id="navLogo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-logo" style="height: 50px; width: 50px;" alt="">
                 <div class="brand-group">
-                    <h1 class="app-brand fw-bold mb-0" style="font-size: 1.4rem;">B-one</h1>
+                    <h1 class="app-brand fw-bold mb-0" style="font-size: 1.4rem;">B-one <span id="adminBadge"></span></h1>
                     <span class="promoter-name-nav" id="navPromoterName">ASSAÏ Boni Awé Didier</span>
                 </div>
             </div>
@@ -118,6 +166,7 @@
                     <li class="nav-item"><a class="nav-link" href="comptabilite.html">Comptabilité</a></li>
                     <li class="nav-item"><a class="nav-link" href="configuration.html">Configuration</a></li>
                     <li class="nav-item"><a class="nav-link" href="maintenance.html">Maintenance</a></li>
+                    <li class="nav-item"><a class="nav-link nav-logout" onclick="logout()"><i class="bi bi-power me-1"></i>Déconnexion</a></li>
                 </ul>
             </div>
         </div>
@@ -152,19 +201,27 @@
         </div>
     </div>
 
-    <div id="installArea" class="container mt-3 text-center" style="display: none;">
-        <button id="installBtn" class="btn btn-primary rounded-pill px-4 shadow-sm" style="background: var(--canva-purple); border: none;">
-            <i class="bi bi-download me-2"></i>Installer l'application B-one
-        </button>
-    </div>
-
     <div class="promoter-footer">
         <p class="mb-0">Application Propriétaire - <span id="footerBrand">B-one</span></p>
         <p class="fw-bold">Promoteur : <span id="footerPromoter">ASSAÏ Boni Awé Didier</span></p>
     </div>
 </main>
 
+<button id="install-pwa-btn" class="pwa-install-fab" aria-label="Installer l'application">
+    <i class="bi bi-download"></i>
+    <span>Installer l'App</span>
+</button>
+
 <script>
+    // Logique PWA : Enregistrement du Service Worker
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('PWA: Service Worker enregistré !'))
+                .catch(err => console.log('PWA: Erreur d\'enregistrement SW:', err));
+        });
+    }
+
     const CONFIG_KEY = 'BONE_OFFICIAL_CONFIG_V2';
     const PROD_KEY = 'BONE_PRODUCTS_LIST';
     const ORDER_KEY = 'BONE_ORDERS_HISTORY';
@@ -174,6 +231,12 @@
         const config = JSON.parse(localStorage.getItem(CONFIG_KEY)) || {};
         const products = JSON.parse(localStorage.getItem(PROD_KEY)) || [];
         const orders = JSON.parse(localStorage.getItem(ORDER_KEY)) || [];
+
+        // Gestion de l'affichage du badge Admin
+        if (isAdmin) {
+            document.getElementById('adminBadge').innerHTML = '<span class="admin-badge">ADMIN</span>';
+            console.log("Accès total accordé : Mode Administrateur activé.");
+        }
 
         // 1. Identité
         if (config.companyName) {
@@ -287,49 +350,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('Service Worker enregistré !'))
-        .catch(err => console.log('Erreur SW:', err));
-    });
-  }
-</script>
+<script src="pwa-setup.js"></script>
 
-<script>
-    let deferredPrompt;
-    const installArea = document.getElementById('installArea');
-    const installBtn = document.getElementById('installBtn');
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-        // Empêcher l'affichage automatique de la bannière
-        e.preventDefault();
-        // Garder l'événement de côté
-        deferredPrompt = e;
-        // Afficher notre bouton d'installation
-        installArea.style.display = 'block';
-
-        installBtn.addEventListener('click', () => {
-            // Cacher le bouton après le clic
-            installArea.style.display = 'none';
-            // Afficher le prompt d'installation natif
-            deferredPrompt.prompt();
-            // Réagir à la décision de l'utilisateur
-            deferredPrompt.userChoice.then((choiceResult) => {
-                if (choiceResult.outcome === 'accepted') {
-                    console.log('Utilisateur a accepté l\'installation');
-                }
-                deferredPrompt = null;
-            });
-        });
-    });
-
-    window.addEventListener('appinstalled', () => {
-        // Cacher complètement la zone si déjà installé
-        installArea.style.display = 'none';
-        deferredPrompt = null;
-    });
-</script>
 </body>
 </html>

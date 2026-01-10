@@ -3,15 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>B-one | Comptabilité & Bénéfices</title>
+    <title>B-one | Tableau de Bord Financier</title>
     
     <meta name="theme-color" content="#7d2ae8">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="B-one">
     <link rel="manifest" href="./manifest.json">
-    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
@@ -44,7 +39,6 @@
         .benefit-positive { color: #2ecc71 !important; font-weight: bold; }
         .benefit-negative { color: #e74c3c !important; font-weight: bold; }
         
-        /* Réduction de la largeur des colonnes */
         .col-date { width: 90px; }
         .col-vente { width: 100px; }
         .col-acq { width: 110px; }
@@ -64,8 +58,11 @@
         }
         @keyframes fadeInSuccess { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
+        /* Style pour masquer le graphique */
+        #chartWrapper { display: none; }
+
         /* Styles Impression Optimisés */
-        #printHeader, #printFooter { display: none; }
+        #printHeader, #printFooter, #summaryPrint { display: none; }
         @media print {
             @page { size: auto; margin: 10mm; }
             body { background: white; padding: 0; margin: 0; }
@@ -73,12 +70,10 @@
             #printArea { display: block; width: 100%; }
             #printHeader { display: block; border-bottom: 2px solid #000; margin-bottom: 20px; padding-bottom: 10px; text-align: center; }
             #printFooter { display: block; margin-top: 40px; page-break-inside: avoid; }
+            #summaryPrint { display: block; margin-bottom: 30px; border: 1px solid #000; padding: 15px; }
             .stats-card { border: 1px solid #eee; box-shadow: none; margin-bottom: 20px; }
             .table { width: 100%; border-collapse: collapse; page-break-inside: auto; font-size: 9pt; }
-            .table tr { page-break-inside: avoid; page-break-after: auto; }
-            .table thead { display: table-header-group; }
             th, td { border: 1px solid #ddd !important; padding: 4px !important; }
-            .input-acquisition { border: none !important; width: auto; font-size: 9pt; }
         }
     </style>
 </head>
@@ -114,43 +109,108 @@
 <main class="container mt-4 px-4" id="printArea">
     <div id="printHeader">
         <h2 class="fw-bold text-uppercase mb-1" id="printTitle">B-ONE GROUP</h2>
-        <p class="mb-0 fw-bold">RAPPORT DE COMPTABILITÉ ET ÉTAT DES MARGES</p>
-        <small class="text-muted" id="printPeriod">Période : Toutes les données</small>
+        <p class="mb-0 fw-bold">BILAN FINANCIER GLOBAL ET ÉTAT DES CAPITAUX</p>
+        <small class="text-muted" id="printPeriod">Période : Historique complet</small>
         <hr>
     </div>
 
     <div class="accounting-section mb-4 no-print">
-        <div class="row g-3 align-items-end">
-            <div class="col-md-3">
-                <label class="small fw-bold">Du</label>
-                <input type="date" id="dateStart" class="form-control" onchange="Finance.renderAccounting()">
+        <div class="row g-3 align-items-center">
+            <div class="col-md-4">
+                <label class="small fw-bold">Taux d'Épargne Croissance (%)</label>
+                <input type="number" id="growthRate" class="form-control" value="10" onchange="Finance.renderAccounting()">
             </div>
-            <div class="col-md-3">
-                <label class="small fw-bold">Au</label>
-                <input type="date" id="dateEnd" class="form-control" onchange="Finance.renderAccounting()">
+            <div class="col-md-4">
+                <label class="small fw-bold">Période du Bilan</label>
+                <select id="periodFilter" class="form-select" onchange="Finance.renderAccounting()">
+                    <option value="all">Tout l'historique</option>
+                    <option value="day">Aujourd'hui</option>
+                    <option value="week">Cette Semaine</option>
+                    <option value="month">Ce Mois-ci</option>
+                    <option value="year">Cette Année</option>
+                </select>
             </div>
-            <div class="col-md-3">
-                <label class="small fw-bold">Recherche</label>
-                <input type="text" id="financeSearch" class="form-control" placeholder="Client/Produit..." onkeyup="Finance.renderAccounting()">
-            </div>
-            <div class="col-md-3 d-flex gap-2">
-                <button class="btn btn-dark w-100" onclick="Finance.printPDF()"><i class="bi bi-printer"></i> Imprimer Rapport</button>
+            <div class="col-md-4 d-flex gap-2 pt-3">
+                <button class="btn btn-dark w-100" onclick="Finance.printPDF()"><i class="bi bi-file-earmark-pdf"></i> Imprimer Bilan</button>
             </div>
         </div>
     </div>
 
     <div class="row g-3 mb-4">
         <div class="col-md-4">
-            <div class="stats-card h-100">
-                <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.7rem;">Chiffre d'Affaires (Base)</small>
-                <h4 class="fw-bold mb-3" id="totalSales">0 F CFA</h4>
-                <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.7rem;">Bénéfice Net PDG</small>
-                <h4 class="fw-bold mb-0 text-success" id="totalProfit">0 F CFA</h4>
+            <div class="stats-card h-100 bg-white">
+                <div class="mb-3">
+                    <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.65rem;">Chiffre d'Affaires Global</small>
+                    <h5 class="fw-bold mb-0" id="totalSales">0 F CFA</h5>
+                </div>
+                <div class="mb-3 border-top pt-2">
+                    <small class="text-muted d-block text-uppercase fw-bold text-primary" style="font-size: 0.65rem;">Capital à Épargner (Stock)</small>
+                    <h5 class="fw-bold mb-0" id="totalCapitalStock">0 F CFA</h5>
+                </div>
+                <div class="mb-0 border-top pt-2">
+                    <small class="text-muted d-block text-uppercase fw-bold text-info" style="font-size: 0.65rem;">Épargne de Croissance (Prévue)</small>
+                    <h5 class="fw-bold mb-0" id="totalGrowthSaving">0 F CFA</h5>
+                </div>
             </div>
         </div>
-        <div class="col-md-8 no-print">
-            <div class="stats-card h-100">
-                <canvas id="evolutionChart" height="100"></canvas>
+        <div class="col-md-4">
+            <div class="stats-card h-100 border-start border-4 border-success">
+                <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.65rem;">Bénéfice Brut (Marge)</small>
+                <h4 class="fw-bold mb-2 text-success" id="totalGrossProfit">0 F CFA</h4>
+                <hr class="my-2">
+                <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.65rem;">Total Retraits (Bénéfices)</small>
+                <p class="mb-1 fw-bold text-danger" id="totalWithdrawProfit">0 F CFA</p>
+                <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.65rem;">Solde Bénéfice Restant</small>
+                <h5 class="fw-bold text-dark" id="remainingProfit">0 F CFA</h5>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card h-100 border-start border-4 border-primary">
+                <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.65rem;">Capital + Épargne Croissance</small>
+                <h4 class="fw-bold mb-2 text-primary" id="theoreticalCapital">0 F CFA</h4>
+                <hr class="my-2">
+                <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.65rem;">Total Retraits (Capital/Inv.)</small>
+                <p class="mb-1 fw-bold text-danger" id="totalWithdrawCapital">0 F CFA</p>
+                <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.65rem;">Solde Capital Réel</small>
+                <h5 class="fw-bold text-dark" id="remainingCapital">0 F CFA</h5>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mb-3 no-print">
+        <button class="btn btn-sm btn-outline-secondary rounded-pill px-4" id="toggleChartBtn" onclick="Finance.toggleChart()">
+            <i class="bi bi-graph-up me-2"></i>Afficher le graphique d'évolution
+        </button>
+    </div>
+
+    <div class="row g-3 mb-4 no-print" id="chartWrapper">
+        <div class="col-12">
+            <div class="stats-card">
+                <h6 class="fw-bold mb-3"><i class="bi bi-graph-up text-purple me-2"></i>Évolution des Marges et Croissance</h6>
+                <canvas id="evolutionChart" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4 no-print">
+        <div class="col-md-6">
+            <div class="stats-card border-top border-3 border-danger">
+                <h6 class="fw-bold small mb-3">Saisir un Retrait sur Bénéfice</h6>
+                <div class="input-group input-group-sm mb-2">
+                    <input type="number" id="outProfitAmt" class="form-control" placeholder="Montant">
+                    <input type="text" id="outProfitMotif" class="form-control" placeholder="Motif">
+                    <button class="btn btn-danger" onclick="Finance.addWithdraw('profit')">OK</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="stats-card border-top border-3 border-warning">
+                <h6 class="fw-bold small mb-3">Saisir un Retrait sur Capital/Épargne</h6>
+                <div class="input-group input-group-sm mb-2">
+                    <input type="number" id="outCapAmt" class="form-control" placeholder="Montant">
+                    <input type="text" id="outCapMotif" class="form-control" placeholder="Motif">
+                    <button class="btn btn-warning" onclick="Finance.addWithdraw('capital')">OK</button>
+                </div>
             </div>
         </div>
     </div>
@@ -162,9 +222,10 @@
                     <tr class="small text-uppercase bg-light">
                         <th class="col-date">Date</th>
                         <th>Client & Désignation</th>
-                        <th class="text-center col-vente">Vente (Base)</th>
-                        <th class="text-center col-acq">Acquisition</th>
-                        <th class="text-end col-marge">Marge PDG</th>
+                        <th class="text-center">Vente (TTC Payé)</th>
+                        <th class="text-center">Acquisition (Cap.)</th>
+                        <th class="text-center text-info">Croissance</th>
+                        <th class="text-end text-success">Marge Réelle</th>
                         <th class="text-end col-action no-print"></th>
                     </tr>
                 </thead>
@@ -173,15 +234,32 @@
         </div>
     </section>
 
+    <section class="accounting-section mt-4">
+        <h6 class="fw-bold small border-bottom pb-2 mb-3">Journal des Mouvements de Caisse</h6>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr class="small text-muted text-uppercase">
+                        <th>Type</th>
+                        <th>Motif</th>
+                        <th class="text-end">Montant</th>
+                        <th class="text-end no-print">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="withdrawLogs" class="small"></tbody>
+            </table>
+        </div>
+    </section>
+
     <div id="printFooter">
         <div class="row">
             <div class="col-8">
-                <small class="text-muted">Généré le : <span id="currentPrintDate"></span></small>
+                <small class="text-muted">Rapport financier généré automatiquement par B-ONE System le : <span id="currentPrintDate"></span></small>
             </div>
             <div class="col-4 text-center">
                 <p class="mb-1 fw-bold text-decoration-underline">Le Président Directeur Général</p>
                 <div style="height: 60px;"></div>
-                <p class="fw-bold mb-0">Atizoun Plateny AMOUSSOU</p>
+                <p class="fw-bold mb-0" id="ceoPrint">Atizoun Plateny AMOUSSOU</p>
                 <small class="text-muted">Cachet et Signature</small>
             </div>
         </div>
@@ -190,38 +268,88 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    // Logique d'enregistrement PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('B-ONE SW enregistré !'))
+                .catch(err => console.error('Erreur SW:', err));
+        });
+    }
+
     const STORAGE_KEY = 'BONE_OFFICIAL_CONFIG_V2';
-    const ORDERS_KEY = 'BONE_USER_ORDERS';
-    let userOrders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
+    const ORDERS_KEY = 'BONE_ORDERS_HISTORY'; 
+    const FLUX_KEY = 'BONE_FINANCE_FLUX'; 
+    const DB_KEY = 'BONE_PRODUCTS_LIST'; // Clé correcte pour récupérer les prix d'achat
+
+    let userOrders = [];
+    let financeFlux = JSON.parse(localStorage.getItem(FLUX_KEY)) || [];
     let myChart = null;
 
     const Finance = {
         init() {
             this.loadBranding();
             document.getElementById('currentPrintDate').innerText = new Date().toLocaleString('fr-FR');
-            // Verrouillage intelligent basé sur l'existence d'un prix d'acquisition
-            userOrders = userOrders.map(o => ({...o, isLocked: (parseFloat(o.acquisitionPrice) > 0)}));
             this.renderAccounting();
         },
 
         loadBranding() {
             const config = JSON.parse(localStorage.getItem(STORAGE_KEY));
-            if(config && config.companyName) {
-                document.getElementById('navCompanyName').innerText = config.companyName;
-                document.getElementById('printTitle').innerText = config.companyName;
+            if(config) {
+                if(config.companyName) {
+                    document.getElementById('navCompanyName').innerText = config.companyName;
+                    document.getElementById('printTitle').innerText = config.companyName;
+                }
+                if(config.ceoName) {
+                    document.getElementById('ceoPrint').innerText = config.ceoName;
+                }
+                if(config.logo) {
+                    document.getElementById('navLogo').src = config.logo;
+                }
             }
         },
 
-        toggleLock(index, isLock) {
-            const input = document.getElementById(`acq-${index}`);
-            if (isLock) {
-                userOrders[index].acquisitionPrice = parseFloat(input.value) || 0;
-                userOrders[index].isLocked = true;
-                this.showToast("Saisie verrouillée");
+        toggleChart() {
+            const wrapper = document.getElementById('chartWrapper');
+            const btn = document.getElementById('toggleChartBtn');
+            if(wrapper.style.display === 'block') {
+                wrapper.style.display = 'none';
+                btn.innerHTML = '<i class="bi bi-graph-up me-2"></i>Afficher le graphique d\'évolution';
             } else {
-                userOrders[index].isLocked = false;
+                wrapper.style.display = 'block';
+                btn.innerHTML = '<i class="bi bi-eye-slash me-2"></i>Masquer le graphique';
+                this.renderAccounting(); 
             }
-            localStorage.setItem(ORDERS_KEY, JSON.stringify(userOrders));
+        },
+
+        addWithdraw(type) {
+            const amtId = type === 'profit' ? 'outProfitAmt' : 'outCapAmt';
+            const motifId = type === 'profit' ? 'outProfitMotif' : 'outCapMotif';
+            const amount = parseFloat(document.getElementById(amtId).value);
+            const motif = document.getElementById(motifId).value;
+
+            if(!amount || !motif) return alert("Veuillez remplir le montant et le motif");
+
+            financeFlux.push({
+                id: Date.now(),
+                type: type,
+                amount: amount,
+                motif: motif,
+                date: new Date().toLocaleDateString('fr-FR'),
+                timestamp: Date.now()
+            });
+
+            localStorage.setItem(FLUX_KEY, JSON.stringify(financeFlux));
+            document.getElementById(amtId).value = '';
+            document.getElementById(motifId).value = '';
+            this.showToast("Mouvement enregistré");
+            this.renderAccounting();
+        },
+
+        deleteWithdraw(id) {
+            if(!confirm("Supprimer ce mouvement ?")) return;
+            financeFlux = financeFlux.filter(f => f.id !== id);
+            localStorage.setItem(FLUX_KEY, JSON.stringify(financeFlux));
             this.renderAccounting();
         },
 
@@ -232,58 +360,134 @@
         },
 
         renderAccounting() {
-            const start = document.getElementById('dateStart').value;
-            const end = document.getElementById('dateEnd').value;
-            const query = document.getElementById('financeSearch').value.toLowerCase();
+            userOrders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
+            // Utilisation de la clé BONE_PRODUCTS_LIST pour retrouver le prix d'achat brut
+            const catalog = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            
+            const period = document.getElementById('periodFilter').value;
+            const growthRate = parseFloat(document.getElementById('growthRate').value) / 100 || 0;
             const table = document.getElementById('accountingTable');
             
-            let sumBase = 0, sumProfit = 0;
+            let stats = {
+                sales: 0, acq: 0, growth: 0, gross: 0,
+                outProfit: 0, outCap: 0
+            };
             let chartData = {};
 
-            const filtered = userOrders.filter(o => {
-                const oDate = o.date ? new Date(o.date.split('/').reverse().join('-')) : null;
-                const matchesDate = (!start || oDate >= new Date(start)) && (!end || oDate <= new Date(end));
-                const matchesSearch = (o.productName?.toLowerCase().includes(query) || o.customerName?.toLowerCase().includes(query));
-                return matchesDate && matchesSearch;
+            const now = new Date();
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            
+            const dayOfWeek = now.getDay() || 7; 
+            const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek - 1)).getTime();
+            
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+            const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
+
+            const filteredOrders = userOrders.filter(o => {
+                if (period === 'all') return true;
+                const oTime = o.timestamp ? new Date(o.timestamp).getTime() : 0;
+                if (period === 'day') return oTime >= startOfDay;
+                if (period === 'week') return oTime >= startOfWeek;
+                if (period === 'month') return oTime >= startOfMonth;
+                if (period === 'year') return oTime >= startOfYear;
+                return true;
             });
 
-            if (filtered.length === 0) {
-                table.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Aucune donnée disponible.</td></tr>`;
-            } else {
-                table.innerHTML = filtered.map(order => {
-                    const idx = userOrders.indexOf(order);
-                    const sale = parseFloat(order.priceBase) || 0;
-                    const acq = parseFloat(order.acquisitionPrice) || 0;
-                    const profit = sale - acq;
-                    const locked = order.isLocked ?? true;
+            table.innerHTML = filteredOrders.map((order) => {
+                // On cherche le produit dans le catalogue par son nom pour récupérer le prix d'achat brut
+                const productInCatalog = catalog.find(p => p.name === order.prodName);
+                
+                let unitAcquisition = 0;
+                // Priorité 1: Prix d'acquisition enregistré directement dans la commande
+                // Priorité 2: Prix d'achat brut (priceBuy) défini dans le catalogue de produits
+                if (order.acquisitionPrice && parseFloat(order.acquisitionPrice) > 0) {
+                    unitAcquisition = parseFloat(order.acquisitionPrice);
+                } else if (productInCatalog && productInCatalog.priceBuy) {
+                    unitAcquisition = parseFloat(productInCatalog.priceBuy);
+                } else if (order.rawPrice) {
+                    unitAcquisition = parseFloat(order.rawPrice);
+                }
 
-                    sumBase += sale;
-                    sumProfit += profit;
-                    if(order.date) chartData[order.date] = (chartData[order.date] || 0) + profit;
+                const quantity = parseInt(order.qty) || 1;
+                const acq = unitAcquisition * quantity;
 
-                    return `
-                    <tr>
-                        <td class="text-muted" style="font-size: 0.75rem;">${order.date || '-'}</td>
-                        <td><div class="fw-bold" style="font-size: 0.85rem;">${order.productName}</div><div class="small text-muted" style="font-size: 0.7rem;">${order.customerName}</div></td>
-                        <td class="text-center fw-bold">${sale.toLocaleString()}</td>
-                        <td class="text-center">
-                            <input type="number" id="acq-${idx}" class="input-acquisition" value="${acq}" ${locked ? 'readonly' : ''}>
-                        </td>
-                        <td class="text-end ${profit >= 0 ? 'benefit-positive' : 'benefit-negative'}">${profit.toLocaleString()}</td>
-                        <td class="text-end no-print">
-                            <button class="btn btn-sm p-1 ${locked ? 'text-primary' : 'btn-success'}" onclick="Finance.toggleLock(${idx}, ${!locked})">
-                                <i class="bi ${locked ? 'bi-pencil-square' : 'bi-check-lg'}"></i>
-                            </button>
-                        </td>
-                    </tr>`;
-                }).join('');
-            }
+                const vBase = parseFloat(order.price) || 0;
+                const tPrice = parseFloat(order.transit) || 0;
+                const dPrice = parseFloat(order.douane) || 0;
+                const lPrice = parseFloat(order.livraison) || 0;
+                
+                let payedAmount = 0;
+                if(order.isPricePayed) payedAmount += vBase;
+                if(order.isTransitPayed) payedAmount += tPrice;
+                if(order.isDouanePayed) payedAmount += dPrice;
+                if(order.isLivraisonPayed) payedAmount += lPrice;
 
-            document.getElementById('totalSales').innerText = `${sumBase.toLocaleString()} F CFA`;
-            document.getElementById('totalProfit').innerText = `${sumProfit.toLocaleString()} F CFA`;
-            document.getElementById('printPeriod').innerText = (start && end) ? `Période : Du ${start} au ${end}` : "Période : Historique complet";
+                const growth = acq * growthRate;
+                const profit = payedAmount - acq - growth;
+
+                stats.sales += payedAmount; 
+                stats.acq += acq; 
+                stats.growth += growth; 
+                stats.gross += profit;
+
+                const dateStr = order.timestamp ? new Date(order.timestamp).toLocaleDateString('fr-FR') : '-';
+                if(dateStr !== '-') chartData[dateStr] = (chartData[dateStr] || 0) + profit;
+
+                return `
+                <tr>
+                    <td class="text-muted" style="font-size: 0.7rem;">${dateStr}</td>
+                    <td><div class="fw-bold">${order.prodName}</div><div class="text-muted small">${order.client} (Qté: ${quantity})</div></td>
+                    <td class="text-center fw-bold">${payedAmount.toLocaleString()}</td>
+                    <td class="text-center">
+                        <input type="number" class="input-acquisition" value="${acq}" readonly title="Prix d'achat unitaire: ${unitAcquisition}">
+                    </td>
+                    <td class="text-center text-info fw-bold">${Math.round(growth).toLocaleString()}</td>
+                    <td class="text-end ${profit >= 0 ? 'benefit-positive' : 'benefit-negative'}">${Math.round(profit).toLocaleString()}</td>
+                    <td class="text-end no-print"><i class="bi bi-lock-fill text-muted"></i></td>
+                </tr>`;
+            }).reverse().join('');
+
+            const filteredFlux = financeFlux.filter(f => {
+                if (period === 'all') return true;
+                const fTime = f.timestamp || 0;
+                if (period === 'day') return fTime >= startOfDay;
+                if (period === 'week') return fTime >= startOfWeek;
+                if (period === 'month') return fTime >= startOfMonth;
+                if (period === 'year') return fTime >= startOfYear;
+                return true;
+            });
+
+            const logTable = document.getElementById('withdrawLogs');
+            logTable.innerHTML = filteredFlux.map(f => {
+                if(f.type === 'profit') stats.outProfit += f.amount;
+                else stats.outCap += f.amount;
+                return `
+                <tr>
+                    <td><span class="badge ${f.type==='profit'?'bg-danger':'bg-warning text-dark'}">${f.type.toUpperCase()}</span></td>
+                    <td>${f.motif} <br><small class="text-muted">${f.date}</small></td>
+                    <td class="text-end fw-bold">-${f.amount.toLocaleString()}</td>
+                    <td class="text-end no-print">
+                        <button class="btn btn-sm text-muted" onclick="Finance.deleteWithdraw(${f.id})"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('totalSales').innerText = `${stats.sales.toLocaleString()} F`;
+            document.getElementById('totalCapitalStock').innerText = `${stats.acq.toLocaleString()} F`;
+            document.getElementById('totalGrowthSaving').innerText = `${Math.round(stats.growth).toLocaleString()} F`;
             
-            this.updateChart(chartData);
+            document.getElementById('totalGrossProfit').innerText = `${Math.round(stats.gross).toLocaleString()} F`;
+            document.getElementById('totalWithdrawProfit').innerText = `-${stats.outProfit.toLocaleString()} F`;
+            document.getElementById('remainingProfit').innerText = `${Math.round(stats.gross - stats.outProfit).toLocaleString()} F`;
+
+            const totalCapPossible = stats.acq + stats.growth;
+            document.getElementById('theoreticalCapital').innerText = `${Math.round(totalCapPossible).toLocaleString()} F`;
+            document.getElementById('totalWithdrawCapital').innerText = `-${stats.outCap.toLocaleString()} F`;
+            document.getElementById('remainingCapital').innerText = `${Math.round(totalCapPossible - stats.outCap).toLocaleString()} F`;
+
+            if(document.getElementById('chartWrapper').style.display === 'block') {
+                this.updateChart(chartData);
+            }
         },
 
         updateChart(data) {
@@ -296,13 +500,20 @@
                 type: 'line',
                 data: {
                     labels: labels,
-                    datasets: [{ label: 'Bénéfice PDG', data: values, borderColor: '#7d2ae8', tension: 0.3, fill: true, backgroundColor: 'rgba(125, 42, 232, 0.05)', pointRadius: 2 }]
+                    datasets: [{ 
+                        label: 'Performance Marge Réelle', 
+                        data: values, 
+                        borderColor: '#7d2ae8', 
+                        tension: 0.3, 
+                        fill: true, 
+                        backgroundColor: 'rgba(125, 42, 232, 0.05)', 
+                        pointRadius: 3 
+                    }]
                 },
                 options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false,
+                    responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { font: { size: 9 } } } }
+                    scales: { y: { beginAtZero: true } }
                 }
             });
         },
@@ -313,16 +524,6 @@
     };
 
     window.onload = () => Finance.init();
-</script>
-
-<script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('Service Worker enregistré !', reg))
-                .catch(err => console.log('Erreur d\'enregistrement SW :', err));
-        });
-    }
 </script>
 </body>
 </html>

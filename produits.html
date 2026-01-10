@@ -5,14 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MT & B-One | Catalogue Produits</title>
     
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#7d2ae8">
-    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="MT & B-One">
-    <link rel="apple-touch-icon" href="https://via.placeholder.com/192/7d2ae8/ffffff?text=MT">
-
+    <link rel="apple-touch-icon" href="https://via.placeholder.com/192">
+    
+    <meta name="theme-color" content="#7d2ae8">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     
@@ -37,7 +35,7 @@
         .navbar-toggler:focus { box-shadow: none; }
 
         /* Barre de Recherche */
-        .search-container { margin-top: -25px; position: relative; z-index: 10; }
+        .search-container { margin-top: -25px; position: relative; font-size: 1rem; z-index: 10; }
         .search-input { 
             border-radius: 30px; border: none; padding: 15px 25px 15px 50px; 
             box-shadow: 0 10px 25px rgba(0,0,0,0.1); font-size: 1rem;
@@ -115,9 +113,35 @@
         .order-status-banner { border-radius: 15px; padding: 15px; font-weight: bold; text-align: center; margin-top: 15px; }
         .order-price-row input { border: none; background: #f0f0f0; border-radius: 5px; width: 60px; text-align: center; font-size: 0.8rem; }
         .order-price-row .form-check-input { cursor: pointer; width: 1.2em; height: 1.2em; border: 2px solid var(--canva-purple); }
+
+        /* Animation de succès */
+        .success-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.95); z-index: 9999;
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .success-checkmark { width: 100px; height: 100px; border-radius: 50%; display: block; stroke-width: 2; stroke: #4bb543; stroke-miterlimit: 10; margin: 10% auto; box-shadow: inset 0px 0px 0px #4bb543; animation: fill .4s ease-in-out .4s forwards, scale .3s ease-in-out .9s both; }
+        .success-checkmark-circle { stroke-dasharray: 166; stroke-dashoffset: 166; stroke-width: 2; stroke-miterlimit: 10; stroke: #4bb543; fill: none; animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards; }
+        .success-checkmark-check { transform-origin: 50% 50%; stroke-dasharray: 48; stroke-dashoffset: 48; animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards; }
+        @keyframes stroke { 100% { stroke-dashoffset: 0; } }
+        @keyframes scale { 0%, 100% { transform: none; } 50% { transform: scale3d(1.1, 1.1, 1); } }
+        @keyframes fill { 100% { box-shadow: inset 0px 0px 0px 50px #4bb543; } }
+        
+        /* Utilitaires pour rôles */
+        .admin-only { display: none; }
+        .user-only { display: block; }
     </style>
 </head>
 <body>
+
+<div id="successOverlay" class="success-overlay">
+    <svg class="success-checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+      <circle class="success-checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+      <path class="success-checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+    </svg>
+    <h3 class="fw-bold text-dark mt-3">PROJET VALIDÉ !</h3>
+    <p class="text-muted">Redirection vers votre panier...</p>
+</div>
 
 <header class="app-header shadow-lg pb-4">
     <nav class="navbar navbar-expand-lg navbar-dark p-3">
@@ -134,16 +158,16 @@
             </button>
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-                    <li class="nav-item"><a class="nav-link" href="index.html"><i class="bi bi-house-door me-1"></i> Accueil</a></li>
-                    <li class="nav-item"><a class="nav-link active" href="produits.html"><i class="bi bi-box-seam me-1"></i> Produits</a></li>
-                    <li class="nav-item"><a class="nav-link" href="panier.html"><i class="bi bi-cart3 me-1"></i> Mon Panier</a></li>
-                    <li class="nav-item"><a class="nav-link" href="paiement.html"><i class="bi bi-credit-card me-1"></i> Paiement</a></li>
-                    <li class="nav-item"><a class="nav-link" href="comptabilite.html"><i class="bi bi-calculator me-1"></i> Comptabilité</a></li>
-                    <li class="nav-item"><a class="nav-link" href="maintenance.html"><i class="bi bi-wrench-adjustable me-1"></i> Maintenance</a></li>
-                    <li class="nav-item"><a class="nav-link" href="configuration.html"><i class="bi bi-gear me-1"></i> Configuration</a></li>
-                    <li class="nav-item border-top mt-2 pt-2 border-white border-opacity-25">
-                        <a class="nav-link text-warning" href="#" id="adminBtnToggle" onclick="Shop.toggleAdmin()">
-                            <i class="bi bi-shield-lock me-1"></i> Afficher Admin
+                    <li class="nav-item nav-home"><a class="nav-link" href="index.html"><i class="bi bi-house-door me-1"></i> Accueil</a></li>
+                    <li class="nav-item nav-products"><a class="nav-link active" href="produits.html"><i class="bi bi-box-seam me-1"></i> Produits</a></li>
+                    <li class="nav-item nav-cart"><a class="nav-link" href="panier.html"><i class="bi bi-cart3 me-1"></i> Mon Panier</a></li>
+                    <li class="nav-item nav-pay"><a class="nav-link" href="paiement.html"><i class="bi bi-credit-card me-1"></i> Paiement</a></li>
+                    <li class="nav-item admin-only"><a class="nav-link" href="comptabilite.html"><i class="bi bi-calculator me-1"></i> Comptabilité</a></li>
+                    <li class="nav-item admin-only"><a class="nav-link" href="maintenance.html"><i class="bi bi-wrench-adjustable me-1"></i> Maintenance</a></li>
+                    <li class="nav-item admin-only"><a class="nav-link" href="configuration.html"><i class="bi bi-gear me-1"></i> Configuration</a></li>
+                    <li class="nav-item border-start ms-lg-2 ps-lg-2 nav-logout">
+                        <a class="nav-link text-warning fw-bold" href="javascript:void(0)" onclick="Shop.logout()">
+                            <i class="bi bi-power me-1"></i> Déconnecter
                         </a>
                     </li>
                 </ul>
@@ -164,7 +188,7 @@
 
     <div class="row g-3" id="productGrid"></div>
 
-    <section class="admin-section mb-5" id="adminPanel" style="display: none;">
+    <section class="admin-section mb-5 admin-only" id="adminPanel">
         <h2 class="h5 fw-bold mb-4"><i class="bi bi-gear-fill me-2"></i>Gestion Administrative</h2>
         
         <ul class="nav nav-tabs mb-3" id="adminTabs" role="tablist">
@@ -214,7 +238,7 @@
     </section>
 </main>
 
-<button class="btn-plus-float shadow-lg" onclick="Shop.openAddModal()" title="Ajouter un produit">
+<button class="btn-plus-float shadow-lg admin-only" id="btnFloatAdd" onclick="Shop.openAddModal()" title="Ajouter un produit">
     <i class="bi bi-plus-lg fs-3"></i>
 </button>
 
@@ -236,12 +260,12 @@
                         <form id="orderForm">
                             <div class="row g-2 mb-3">
                                 <div class="col-6">
-                                    <label class="form-label small fw-bold">NOM DU CLIENT</label>
-                                    <input type="text" id="orderClientName" class="form-control rounded-pill" placeholder="Ex: Jean Dupont">
+                                    <label class="form-label small fw-bold">NOM DU CLIENT *</label>
+                                    <input type="text" id="orderClientName" class="form-control rounded-pill" placeholder="Ex: Jean Dupont" required>
                                 </div>
                                 <div class="col-6">
-                                    <label class="form-label small fw-bold">TÉLÉPHONE</label>
-                                    <input type="tel" id="orderClientPhone" class="form-control rounded-pill" placeholder="Ex: 0102030405">
+                                    <label class="form-label small fw-bold">TÉLÉPHONE *</label>
+                                    <input type="tel" id="orderClientPhone" class="form-control rounded-pill" placeholder="Ex: 0102030405" required>
                                 </div>
                             </div>
 
@@ -334,12 +358,14 @@
                             <input type="number" id="pStock" class="form-control rounded-pill" placeholder="0 = Sur commande">
                         </div>
                     </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Prix d'Achat Brut (Capital unité)</label>
+                        <input type="number" id="pPriceBuy" class="form-control rounded-pill bg-light" placeholder="Ex: 5000" required>
+                    </div>
+
                     <div class="row g-2 mb-3">
-                        <div class="col-4">
-                            <label class="form-label small fw-bold">Achat Brut</label>
-                            <input type="number" id="pPriceBuy" class="form-control rounded-pill bg-light">
-                        </div>
-                        <div class="col-4">
+                        <div class="col-6">
                             <label class="form-label small fw-bold">Devise</label>
                             <select id="pCurrency" class="form-select rounded-pill">
                                 <option value="F CFA">F CFA</option>
@@ -347,7 +373,7 @@
                                 <option value="$">$</option>
                             </select>
                         </div>
-                        <div class="col-4">
+                        <div class="col-6">
                             <label class="form-label small fw-bold">Pays d'Origine</label>
                             <div class="input-group">
                                 <select id="pOrigin" class="form-select rounded-start-pill"></select>
@@ -377,7 +403,11 @@
                         <div class="col-md-4">
                             <div class="canal-box">
                                 <h6 class="fw-bold text-success mb-2"><i class="bi bi-shop"></i> DIRECT (Magasin)</h6>
-                                <input type="number" id="pDirectTTC" class="form-control form-control-sm" placeholder="Prix TTC Final">
+                                <input type="number" id="pDirectTTC" class="form-control form-control-sm mb-2" placeholder="Prix TTC Final">
+                                <hr class="my-2">
+                                <label class="small fw-bold text-muted">OPTION GROS</label>
+                                <input type="number" id="pGrosTTC" class="form-control form-control-sm mb-1" placeholder="Prix TTC Gros">
+                                <input type="number" id="pGrosQty" class="form-control form-control-sm" placeholder="Qté min. pour gros">
                             </div>
                         </div>
                     </div>
@@ -386,7 +416,7 @@
                         <input type="file" id="pImgFile" class="form-control rounded-pill" accept="image/*">
                         <input type="hidden" id="pImgBase64">
                     </div>
-                    <button type="submit" class="btn btn-primary w-100 py-3 shadow rounded-pill fw-bold">ENREGISTRER</button>
+                    <button type="submit" id="btnSaveMain" class="btn btn-primary w-100 py-3 shadow rounded-pill fw-bold">ENREGISTRER</button>
                 </form>
             </div>
         </div>
@@ -429,7 +459,7 @@
                     <button class="share-btn-img w-100" onclick="Shop.shareProductImg()"><i class="bi bi-image me-2"></i>Télécharger l'affiche</button>
                     <button class="share-btn-link w-100" onclick="Shop.shareProductLink()"><i class="bi bi-whatsapp me-2"></i>Commander via WhatsApp</button>
                     <button class="btn-close-modal w-100" data-bs-dismiss="modal"><i class="bi bi-x-circle me-2"></i>FERMER LA FICHE</button>
-                    <button id="modalBtnDelete" class="btn btn-outline-danger w-100 mt-2 border-0" style="display:none;" onclick="Shop.deleteCurrentProduct()">
+                    <button id="modalBtnDelete" class="btn btn-outline-danger w-100 mt-2 border-0 admin-only" onclick="Shop.deleteCurrentProduct()">
                         <i class="bi bi-trash3 me-2"></i>Supprimer définitivement ce produit
                     </button>
                 </div>
@@ -443,7 +473,7 @@
     const DB_KEY = 'BONE_PRODUCTS_LIST';
     const CAT_KEY = 'BONE_CATEGORIES_LIST';
     const ORIGIN_KEY = 'BONE_ORIGINS_LIST';
-    const ADMIN_KEY = 'BONE_ADMIN_AUTH';
+    const SESSION_KEY = 'BONE_USER_SESSION';
     const ORDERS_KEY = 'BONE_ORDERS_HISTORY';
 
     let products = JSON.parse(localStorage.getItem(DB_KEY)) || [];
@@ -454,13 +484,46 @@
     const Shop = {
         currentOrderProduct: null,
         selectedPrices: [],
+        isAdmin: false,
 
         init() {
+            this.checkSession();
             this.renderCategories();
             this.renderOrigins();
             this.render();
-            this.checkAdminStatus();
             this.loadBrandConfig();
+        },
+
+        checkSession() {
+            const session = JSON.parse(localStorage.getItem(SESSION_KEY));
+            if (!session) {
+                window.location.href = 'login.html';
+                return;
+            }
+            this.isAdmin = (session.role === 'admin');
+            
+            // Affichage/Masquage des éléments selon le rôle
+            const adminElements = document.querySelectorAll('.admin-only');
+            adminElements.forEach(el => {
+                el.style.setProperty('display', this.isAdmin ? 'block' : 'none', 'important');
+            });
+
+            // Masquage des éléments du menu pour les utilisateurs (Règle spécifique)
+            if(!this.isAdmin) {
+                document.querySelector('.nav-home')?.style.setProperty('display', 'none', 'important');
+                document.querySelector('.nav-cart')?.style.setProperty('display', 'none', 'important');
+                document.querySelector('.nav-pay')?.style.setProperty('display', 'none', 'important');
+            }
+
+            if(this.isAdmin) {
+                this.renderAdminTable();
+                this.renderOrdersTable();
+            }
+        },
+
+        logout() {
+            localStorage.removeItem(SESSION_KEY);
+            window.location.href = 'login.html';
         },
 
         loadBrandConfig() {
@@ -480,44 +543,15 @@
             }
         },
 
-        checkAdminStatus() {
-            const isAdmin = localStorage.getItem(ADMIN_KEY) === 'true';
-            document.getElementById('adminPanel').style.display = isAdmin ? 'block' : 'none';
-            document.getElementById('modalBtnDelete').style.display = isAdmin ? 'block' : 'none';
-            document.getElementById('adminBtnToggle').innerHTML = isAdmin ? '<i class="bi bi-shield-shaded me-1"></i> Masquer Admin' : '<i class="bi bi-shield-lock me-1"></i> Afficher Admin';
-            if(isAdmin) {
-                this.renderAdminTable();
-                this.renderOrdersTable();
-            }
-            this.renderCategories();
-        },
-
-        toggleAdmin() {
-            const current = localStorage.getItem(ADMIN_KEY);
-            if(current === 'true') {
-                localStorage.setItem(ADMIN_KEY, 'false');
-                this.checkAdminStatus();
-            } else {
-                const pass = prompt("Accès Admin :");
-                if(pass === "1234") { 
-                    localStorage.setItem(ADMIN_KEY, 'true'); 
-                    this.checkAdminStatus(); 
-                } else {
-                    alert("Accès refusé");
-                }
-            }
-        },
-
         renderCategories() {
             const tabs = document.getElementById('categoryTabs');
             const select = document.getElementById('pCat');
-            const isAdmin = localStorage.getItem(ADMIN_KEY) === 'true';
             
             tabs.innerHTML = `<div class="cat-badge active" onclick="Shop.filter('Tous', this)">Tous</div>` + 
                 categories.map(c => `
                     <div class="cat-badge" onclick="Shop.filter('${c}', this)">
                         ${c}
-                        ${isAdmin ? `<i class="bi bi-x-circle btn-del-cat" onclick="event.stopPropagation(); Shop.deleteCategory('${c}')"></i>` : ''}
+                        ${this.isAdmin ? `<i class="bi bi-x-circle btn-del-cat" onclick="event.stopPropagation(); Shop.deleteCategory('${c}')"></i>` : ''}
                     </div>`).join('');
             select.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
         },
@@ -564,7 +598,7 @@
                             <span class="price-tag">${displayPrice} ${p.currency || 'F CFA'}</span>
                             <div class="d-flex gap-1">
                                 <button class="btn-cart-prod" onclick="event.stopPropagation(); Shop.openOrderModal(${p.id})"><i class="bi bi-cart-plus"></i></button>
-                                <button class="btn-edit-prod" onclick="event.stopPropagation(); Shop.openEditModal(${p.id})"><i class="bi bi-pencil-square"></i></button>
+                                ${this.isAdmin ? `<button class="btn-edit-prod" onclick="event.stopPropagation(); Shop.openEditModal(${p.id})"><i class="bi bi-pencil-square"></i></button>` : ''}
                             </div>
                         </div>
                     </div>
@@ -608,6 +642,17 @@
                         </td>
                     </tr>`;
                 }
+                if(p.canaux.direct?.grosTTC) {
+                    priceRows += `
+                    <tr class="order-price-row text-center bg-light">
+                        <td><small>📦 GROS</small></td>
+                        <td colspan="4" class="text-center"><small>Dès ${p.canaux.direct.grosQty || 1} unités</small></td>
+                        <td class="fw-bold d-flex align-items-center justify-content-center gap-2">
+                            ${p.canaux.direct.grosTTC.toLocaleString()}
+                            <input type="checkbox" class="form-check-input" onclick="Shop.togglePriceSelection(${p.canaux.direct.grosTTC}, this)">
+                        </td>
+                    </tr>`;
+                }
             }
             document.getElementById('orderPriceTable').innerHTML = priceRows || "<tr><td colspan='6' class='text-center'>Aucun tarif défini</td></tr>";
             
@@ -631,10 +676,31 @@
                 <td><input type="number" value="${d}" readonly> <input type="checkbox" id="checkDouane${type}" class="form-check-input mt-1" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.value), this)"></td>
                 <td><input type="number" value="${l}" readonly> <input type="checkbox" id="checkLivraison${type}" class="form-check-input mt-1" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.value), this)"></td>
                 <td class="fw-bold d-flex align-items-center justify-content-center gap-1">
-                    <span class="tot-span">${tot}</span>
-                    <input type="checkbox" class="form-check-input" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.innerText), this)">
+                    <span class="tot-span" style="cursor:pointer;" onclick="Shop.autoSelectRow(this)">${tot}</span>
                 </td>
             </tr>`;
+        },
+
+        autoSelectRow(spanEl) {
+            const row = spanEl.closest('tr');
+            const checkboxes = row.querySelectorAll('.form-check-input');
+            
+            checkboxes.forEach(cb => {
+                if(!cb.checked) {
+                    cb.checked = true;
+                    let val = 0;
+                    if(cb.previousElementSibling) {
+                        val = parseInt(cb.previousElementSibling.value || cb.previousElementSibling.innerText) || 0;
+                    }
+                    if (val > 0) this.selectedPrices.push(val);
+                }
+            });
+
+            const totalSelected = this.selectedPrices.reduce((sum, val) => sum + val, 0);
+            const qty = parseInt(document.getElementById('orderQty').value) || 1;
+            document.getElementById('orderCustomPrice').value = totalSelected;
+            document.getElementById('orderPayment').value = totalSelected * qty;
+            this.calculateOrder();
         },
 
         togglePriceSelection(price, checkbox) {
@@ -646,13 +712,10 @@
                     this.selectedPrices.splice(index, 1);
                 }
             }
-            
             const totalSelected = this.selectedPrices.reduce((sum, val) => sum + val, 0);
             const qty = parseInt(document.getElementById('orderQty').value) || 1;
-            
             document.getElementById('orderCustomPrice').value = totalSelected;
             document.getElementById('orderPayment').value = totalSelected * qty;
-            
             this.calculateOrder();
         },
 
@@ -661,15 +724,12 @@
             const price = parseInt(document.getElementById('orderCustomPrice').value) || 0;
             const payed = parseInt(document.getElementById('orderPayment').value) || 0;
             const total = qty * price;
-            
             document.getElementById('valTotal').innerText = total.toLocaleString() + " F CFA";
-            
             const banner = document.getElementById('orderStatusBanner');
             if(qty > 0 && price > 0) {
                 banner.style.display = "block";
                 const hasStock = (this.currentOrderProduct.stock >= qty);
                 const paymentOk = (payed >= total && total > 0);
-
                 if(paymentOk) {
                     if(hasStock) {
                         banner.className = "order-status-banner bg-success-subtle text-success border border-success";
@@ -688,34 +748,43 @@
         },
 
         validateProject() {
+            const clientName = document.getElementById('orderClientName').value.trim();
+            const clientPhone = document.getElementById('orderClientPhone').value.trim();
+
+            if(!clientName || !clientPhone) {
+                alert("Erreur : Le Nom et le Contact du client sont obligatoires.");
+                return;
+            }
+
             const currentProduct = this.currentOrderProduct;
-            
             const isAvion = document.getElementById('row-avion') ? true : false;
             const isBateau = document.getElementById('row-bateau') ? true : false;
             const type = isAvion ? 'avion' : (isBateau ? 'bateau' : 'Direct');
+            
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('fr-FR');
+            const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
             const newOrder = {
-                id: Date.now().toString(),
+                id: "CMD-" + Date.now(),
+                timestamp: Date.now(),
                 prodId: currentProduct.id,
                 prodName: currentProduct.name,
                 ref: currentProduct.uniqueId,
-                client: document.getElementById('orderClientName').value || 'Client Anonyme',
-                phone: document.getElementById('orderClientPhone').value || '',
-                
+                client: clientName,
+                phone: clientPhone,
                 price: currentProduct.canaux[type.toLowerCase()]?.vente || currentProduct.canaux.direct?.ttc || 0,
                 transit: currentProduct.canaux[type.toLowerCase()]?.transit || 0,
                 douane: currentProduct.canaux[type.toLowerCase()]?.douane || 0,
                 livraison: currentProduct.canaux[type.toLowerCase()]?.liv || 0,
-
                 isPricePayed: document.getElementById(`checkPrice${type}`)?.checked || document.getElementById('checkPriceDirect')?.checked || false,
                 isTransitPayed: document.getElementById(`checkTransit${type}`)?.checked || false,
                 isDouanePayed: document.getElementById(`checkDouane${type}`)?.checked || false,
                 isLivraisonPayed: document.getElementById(`checkLivraison${type}`)?.checked || false,
-
                 qty: parseInt(document.getElementById('orderQty').value) || 1,
                 total: (parseInt(document.getElementById('orderCustomPrice').value) || 0) * (parseInt(document.getElementById('orderQty').value) || 1),
                 status: (currentProduct.stock >= (parseInt(document.getElementById('orderQty').value) || 1)) ? "Validée" : "À Lancer",
-                date: new Date().toLocaleString()
+                date: `${dateStr} à ${timeStr}`
             };
 
             orders.push(newOrder);
@@ -727,9 +796,14 @@
                 localStorage.setItem(DB_KEY, JSON.stringify(products));
             }
 
-            alert("Commande enregistrée avec succès !");
             bootstrap.Modal.getInstance(document.getElementById('orderModal')).hide();
-            this.init();
+            
+            const overlay = document.getElementById('successOverlay');
+            overlay.style.display = 'flex';
+            
+            setTimeout(() => {
+                window.location.href = "panier.html";
+            }, 2500);
         },
 
         openAddModal() {
@@ -747,7 +821,7 @@
             document.getElementById('pCat').value = p.cat;
             document.getElementById('pQualities').value = p.qualities || "";
             document.getElementById('pStock').value = p.stock || "";
-            document.getElementById('pPriceBuy').value = p.priceBuy || "";
+            document.getElementById('pPriceBuy').value = p.priceBuy || ""; 
             document.getElementById('pCurrency').value = p.currency || "F CFA";
             document.getElementById('pOrigin').value = p.origin || "";
             document.getElementById('pImgBase64').value = p.img;
@@ -761,22 +835,24 @@
                 document.getElementById('pBateauDouane').value = p.canaux.bateau?.douane || "";
                 document.getElementById('pBateauLiv').value = p.canaux.bateau?.liv || "";
                 document.getElementById('pDirectTTC').value = p.canaux.direct?.ttc || "";
+                document.getElementById('pGrosTTC').value = p.canaux.direct?.grosTTC || "";
+                document.getElementById('pGrosQty').value = p.canaux.direct?.grosQty || "";
             }
             new bootstrap.Modal(document.getElementById('addModal')).show();
         },
 
         saveProduct(e) {
-            e.preventDefault();
+            if(e) e.preventDefault();
             const editId = document.getElementById('editProductId').value;
             
             const pData = {
                 id: editId ? parseInt(editId) : Date.now(),
                 uniqueId: editId ? products.find(x => x.id == editId).uniqueId : "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase(),
                 name: document.getElementById('pName').value,
+                priceBuy: parseFloat(document.getElementById('pPriceBuy').value) || 0,
                 cat: document.getElementById('pCat').value,
                 qualities: document.getElementById('pQualities').value,
                 stock: parseInt(document.getElementById('pStock').value) || 0,
-                priceBuy: parseInt(document.getElementById('pPriceBuy').value) || 0,
                 currency: document.getElementById('pCurrency').value,
                 origin: document.getElementById('pOrigin').value,
                 img: document.getElementById('pImgBase64').value || "https://via.placeholder.com/150",
@@ -793,7 +869,11 @@
                         douane: parseInt(document.getElementById('pBateauDouane').value) || 0, 
                         liv: parseInt(document.getElementById('pBateauLiv').value) || 0 
                     },
-                    direct: { ttc: parseInt(document.getElementById('pDirectTTC').value) || 0 }
+                    direct: { 
+                        ttc: parseInt(document.getElementById('pDirectTTC').value) || 0,
+                        grosTTC: parseInt(document.getElementById('pGrosTTC').value) || 0,
+                        grosQty: parseInt(document.getElementById('pGrosQty').value) || 0
+                    }
                 }
             };
             
@@ -803,10 +883,11 @@
             } else { 
                 products.push(pData); 
             }
-            
             localStorage.setItem(DB_KEY, JSON.stringify(products));
-            bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
-            this.checkAdminStatus();
+            const modalEl = document.getElementById('addModal');
+            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+            if(modalInstance) modalInstance.hide();
+            this.checkSession();
             this.render();
             this.scrollToProduct(pData.id);
         },
@@ -827,14 +908,12 @@
             document.getElementById('modalQualities').innerText = p.qualities || "";
             document.getElementById('modalUniqueIdDisplay').innerText = p.uniqueId;
             document.getElementById('modalOrigin').innerText = "Origine : " + (p.origin || 'N/C');
-            
             const stockDiv = document.getElementById('modalStockDisplay');
             if(p.stock && p.stock > 0) {
                 stockDiv.innerHTML = `<span class="stock-badge bg-success text-white">📦 STOCK DISPONIBLE : ${p.stock}</span>`;
             } else {
                 stockDiv.innerHTML = `<span class="stock-badge bg-warning text-dark">⏳ SUR COMMANDE</span>`;
             }
-
             let htmlPrices = "";
             const curr = p.currency || 'F CFA';
             if(p.canaux) {
@@ -850,9 +929,11 @@
                 if(c.direct?.ttc) {
                     htmlPrices += `<div class="mb-2 p-2 border rounded bg-light"><div class="d-flex justify-content-between fw-bold text-success"><span>🏠 AU MAGASIN (Direct)</span><span>${c.direct.ttc.toLocaleString()} ${curr}</span></div></div>`;
                 }
+                if(c.direct?.grosTTC) {
+                    htmlPrices += `<div class="mb-2 p-2 border border-primary rounded" style="background: #f0f7ff;"><div class="d-flex justify-content-between fw-bold text-primary"><span>📦 PRIX DE GROS (x${c.direct.grosQty})</span><span>${parseInt(c.direct.grosTTC).toLocaleString()} ${curr}</span></div></div>`;
+                }
             }
             document.getElementById('modalPriceList').innerHTML = htmlPrices || "<p class='text-muted'>Aucun prix configuré</p>";
-            
             this.loadBrandConfig();
             new bootstrap.Modal(document.getElementById('productModal')).show();
         },
@@ -863,14 +944,12 @@
             const ref = document.getElementById('modalUniqueIdDisplay').innerText;
             const qualities = document.getElementById('modalQualities').innerText;
             const p = products.find(x => x.id == document.getElementById('currentProductId').value);
-            
             const stockTxt = (p && p.stock > 0) ? `✅ Stock : ${p.stock}` : `⏳ Sur commande`;
             const company = config.companyName || "MT & B-One";
             const ceo = config.ceoName || "L'Administrateur";
             const phoneRaw = config.ceoWhatsapp || "";
             const phoneForLink = phoneRaw.replace(/\s+/g, '').replace('+', '');
             const curr = p.currency || 'F CFA';
-
             let priceTxt = "";
             if(p.canaux) {
                 if(p.canaux.avion?.vente) {
@@ -888,8 +967,10 @@
                 if(p.canaux.direct?.ttc) {
                     priceTxt += `🏠 *MAGASIN (Direct) :* ${p.canaux.direct.ttc.toLocaleString()} ${curr}\n`;
                 }
+                if(p.canaux.direct?.grosTTC) {
+                    priceTxt += `📦 *PRIX DE GROS :* ${parseInt(p.canaux.direct.grosTTC).toLocaleString()} ${curr} (dès ${p.canaux.direct.grosQty})\n`;
+                }
             }
-            
             const productOrders = orders.filter(o => o.prodId == p.id);
             let clientTxt = "";
             if(productOrders.length > 0) {
@@ -898,7 +979,25 @@
                     clientTxt += `   ${i+1}. ${o.client} (Qté: ${o.qty})\n`;
                 });
             }
+            
+            let momoTxt = "";
+            if(config.momoAccounts && config.momoAccounts.length > 0) {
+                momoTxt = `\n💳 *PAIEMENT MOBILE MONEY :*\n`;
+                config.momoAccounts.forEach(acc => {
+                    momoTxt += `   - ${acc.network} : ${acc.phone}\n`;
+                });
+            }
 
+            let associateTxt = "";
+            if(config.associates && config.associates.length > 0) {
+                associateTxt = `\n🤝 *CONTACTS ASSOCIÉS :*\n`;
+                config.associates.forEach(assoc => {
+                    const cleanPhone = assoc.phone.replace(/\s+/g, '').replace('+', '');
+                    if(cleanPhone) {
+                        associateTxt += `   - ${assoc.country} : https://wa.me/${cleanPhone}\n`;
+                    }
+                });
+            }
             return `🌟 *DISPONIBILITÉ : ${company}*\n` +
                         `━━━━━━━━━━━━━━━━━━\n\n` +
                         `📦 *Produit :* ${title}\n` +
@@ -906,9 +1005,11 @@
                         `📊 *État :* ${stockTxt}\n` +
                         `✨ *Qualités :* ${qualities || 'Qualité Premium'}\n\n` +
                         `💰 *NOS TARIFS DÉTAILLÉS :*\n${priceTxt}` +
+                        `${momoTxt}` +
                         `${clientTxt}\n` +
                         `🚀 *Meilleurs prix garantis.*\n\n` +
-                        `📲 *Contact :* https://wa.me/${phoneForLink}\n\n` +
+                        `📲 *Contact PDG :* https://wa.me/${phoneForLink}\n` +
+                        `${associateTxt}\n` +
                         `✍️ _Signé : ${ceo}_`;
         },
 
@@ -920,18 +1021,14 @@
         shareProductImg() {
             const p = products.find(x => x.id == document.getElementById('currentProductId').value);
             if(!p) return;
-            
-            const btn = event.target;
+            const btn = event.currentTarget;
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Génération...';
             btn.disabled = true;
-
-            // Copie simultanée du texte
             const textToCopy = this.getPublishText();
             navigator.clipboard.writeText(textToCopy).catch(err => {
                 console.error('Erreur lors de la copie du texte: ', err);
             });
-            
             const area = document.getElementById('captureArea');
             setTimeout(() => {
                 html2canvas(area, { useCORS: true, scale: 2 }).then(canvas => {
@@ -953,7 +1050,6 @@
             const company = config.companyName || "MT & B-One";
             const phoneRaw = config.ceoWhatsapp || "";
             const phoneForLink = phoneRaw.replace(/\s+/g, '').replace('+', '');
-            
             const p = products.find(x => x.id == document.getElementById('currentProductId').value);
             const curr = p.currency || 'F CFA';
             
@@ -972,13 +1068,21 @@
                 }
             }
 
+            let momoLines = "";
+            if(config.momoAccounts && config.momoAccounts.length > 0) {
+                momoLines = `\n\n💳 *Comptes de dépôt :*`;
+                config.momoAccounts.forEach(acc => {
+                    momoLines += `\n- ${acc.network} : ${acc.phone}`;
+                });
+            }
+
             const msg = `*DEMANDE DE COMMANDE - ${company}*\n\n` +
                         `Bonjour, je souhaiterais passer une commande pour le produit suivant :\n\n` +
                         `📦 *Produit :* ${title}\n` +
                         `🔍 *Référence :* ${ref}\n` +
-                        `${priceLines}\n\n` +
+                        `${priceLines}` +
+                        `${momoLines}\n\n` +
                         `Pourriez-vous m'indiquer la marche à suivre ? Merci d'avance.`;
-            
             window.open(`https://wa.me/${phoneForLink}?text=${encodeURIComponent(msg)}`, '_blank');
         },
 
@@ -1021,7 +1125,7 @@
                     <td class="fw-bold">${o.total.toLocaleString()}</td>
                     <td><span class="badge ${o.status === 'Validée' ? 'bg-success' : 'bg-info'}">${o.status}</span></td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-danger" onclick="Shop.deleteOrder(${o.id})"><i class="bi bi-trash"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="Shop.deleteOrder(${o.id})"><i class="bi bi-trash-fill"></i></button>
                     </td>
                 </tr>
             `).reverse().join('');
@@ -1066,29 +1170,74 @@
     };
 
     document.getElementById('pImgFile').onchange = function(e) {
+        const file = e.target.files[0];
+        if(!file) return;
         const reader = new FileReader();
-        reader.onload = function() { document.getElementById('pImgBase64').value = reader.result; };
-        if(e.target.files[0]) reader.readAsDataURL(e.target.files[0]);
+        reader.onload = function(event) { 
+            document.getElementById('pImgBase64').value = event.target.result; 
+        };
+        reader.readAsDataURL(file);
     };
 
-    document.getElementById('addProductForm').onsubmit = (e) => Shop.saveProduct(e);
+    document.getElementById('addProductForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        Shop.saveProduct();
+    });
 
     window.onload = () => {
         Shop.init();
     };
+
+    // LOGIQUE PWA : Service Worker & Manifest
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            const swCode = `
+                const CACHE_NAME = 'mt-bone-v1';
+                const urlsToCache = [
+                    '/',
+                    '/index.html',
+                    '/produits.html',
+                    '/panier.html',
+                    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
+                    'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css'
+                ];
+
+                self.addEventListener('install', event => {
+                    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache)));
+                });
+
+                self.addEventListener('fetch', event => {
+                    event.respondWith(
+                        caches.match(event.request).then(response => response || fetch(event.request))
+                    );
+                });
+            `;
+            const blob = new Blob([swCode], {type: 'text/javascript'});
+            const swUrl = URL.createObjectURL(blob);
+            navigator.serviceWorker.register(swUrl).catch(err => console.log('SW error:', err));
+        });
+    }
+
+    // Création dynamique du Manifest
+    const manifest = {
+        "name": "MT & B-One Catalogue",
+        "short_name": "MT & B-One",
+        "start_url": "index.html",
+        "display": "standalone",
+        "background_color": "#ffffff",
+        "theme_color": "#7d2ae8",
+        "icons": [
+            { "src": "https://via.placeholder.com/192", "sizes": "192x192", "type": "image/png" },
+            { "src": "https://via.placeholder.com/512", "sizes": "512x512", "type": "image/png" }
+        ]
+    };
+    const stringManifest = JSON.stringify(manifest);
+    const blob = new Blob([stringManifest], {type: 'application/json'});
+    const manifestURL = URL.createObjectURL(blob);
+    document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestURL}">`);
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('Service Worker enregistré !', reg))
-                .catch(err => console.log('Erreur SW:', err));
-        });
-    }
-</script>
-
 </body>
 </html>
