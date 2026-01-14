@@ -20,9 +20,13 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Stratégie de cache : Network First (on privilégie le réseau, sinon le cache)
-// Idéal pour votre application qui utilise du localStorage
+// Stratégie de cache : Network First avec exclusion pour Google Sheets
 self.addEventListener('fetch', (event) => {
+  // SOLUTION : Si la requête va vers Google Script, on laisse passer sans intercepter
+  if (event.request.url.includes('script.google.com')) {
+    return; // On sort de l'événement, le navigateur fait le fetch normalement
+  }
+
   event.respondWith(
     fetch(event.request).catch(() => {
       return caches.match(event.request);
