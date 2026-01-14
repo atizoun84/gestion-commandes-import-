@@ -614,7 +614,12 @@
             bootstrap.Modal.getInstance(document.getElementById('finalizeModal')).hide();
             const overlay = document.getElementById('successOverlay');
             overlay.style.display = 'flex';
-            setTimeout(() => { overlay.style.display = 'none'; this.renderOrders(); }, 2000);
+            setTimeout(() => { 
+                overlay.style.display = 'none'; 
+                this.renderOrders(); 
+                // Synchronisation Cloud après mise à jour règlement
+                if(window.SyncManager) window.SyncManager.syncAll();
+            }, 2000);
         },
 
         updateSummary(validated, pending, pendingPayed, pendingRemaining) {
@@ -625,7 +630,19 @@
             document.getElementById('grandTotal').innerText = ((validated || 0) + (pending || 0)).toLocaleString() + " F CFA";
         },
 
-        deleteOrder(id) { if(confirm("Supprimer ?")) { this.orders = this.orders.filter(o => o.id !== id); localStorage.setItem(ORDERS_KEY, JSON.stringify(this.orders)); this.renderOrders(); } },
+        deleteOrder(id) {
+            if(confirm("Voulez-vous supprimer cette commande du système ?")) {
+                this.orders = this.orders.filter(o => o.id !== id);
+                localStorage.setItem(ORDERS_KEY, JSON.stringify(this.orders));
+                this.renderOrders();
+                
+                // Notification au Cloud
+                if(window.SyncManager) {
+                    window.SyncManager.deleteItem('BONE_ORDERS_HISTORY', id);
+                }
+            }
+        },
+
         clearOrders() { if(confirm("Vider l'historique ?")) { localStorage.removeItem(ORDERS_KEY); this.renderOrders(); } },
         openRecapModal() { new bootstrap.Modal(document.getElementById('recapModal')).show(); },
         updateRecapPreview() { /* Logique recap ici */ }

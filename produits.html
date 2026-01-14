@@ -1088,12 +1088,8 @@
 
         deleteCurrentProduct() {
             const id = parseInt(document.getElementById('currentProductId').value);
-            if(confirm("Supprimer définitivement ce produit ?")) {
-                products = products.filter(p => p.id !== id);
-                localStorage.setItem(DB_KEY, JSON.stringify(products));
-                bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
-                this.init();
-            }
+            this.deleteProduct(id);
+            bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
         },
 
         renderAdminTable() {
@@ -1152,11 +1148,17 @@
             this.scrollToProduct(clone.id);
         },
 
+        // LOGIQUE DE SUPPRESSION MISE À JOUR
         deleteProduct(id) {
-            if(confirm("Supprimer ce produit ?")) { 
-                products = products.filter(p => p.id !== id); 
-                localStorage.setItem(DB_KEY, JSON.stringify(products)); 
-                this.init(); 
+            if(confirm("Supprimer ce produit définitivement ?")) {
+                products = products.filter(p => p.id !== id);
+                localStorage.setItem(DB_KEY, JSON.stringify(products));
+                this.init();
+                
+                // Suppression Cloud si disponible
+                if(window.SyncManager) {
+                    window.SyncManager.deleteItem(DB_KEY, id);
+                }
             }
         },
 

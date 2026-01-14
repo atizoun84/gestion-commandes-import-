@@ -451,6 +451,12 @@
             userOrders[idx].nextDate = document.getElementById('nextStepDate').value;
             
             localStorage.setItem(ORDERS_KEY, JSON.stringify(userOrders));
+
+            // Forcer la mise à jour immédiate vers Google Sheets
+            if(window.SyncManager) {
+                window.SyncManager.pushCategory('orders', 'BONE_ORDERS_HISTORY');
+            }
+
             this.renderOrders();
             orderModalObj.hide();
             alert("Données enregistrées !");

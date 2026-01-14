@@ -280,7 +280,7 @@
     const STORAGE_KEY = 'BONE_OFFICIAL_CONFIG_V2';
     const ORDERS_KEY = 'BONE_ORDERS_HISTORY'; 
     const FLUX_KEY = 'BONE_FINANCE_FLUX'; 
-    const DB_KEY = 'BONE_PRODUCTS_LIST'; // Clé correcte pour récupérer les prix d'achat
+    const DB_KEY = 'BONE_PRODUCTS_LIST'; 
 
     let userOrders = [];
     let financeFlux = JSON.parse(localStorage.getItem(FLUX_KEY)) || [];
@@ -346,11 +346,18 @@
             this.renderAccounting();
         },
 
+        // Fonction mise à jour avec Cloud Sync
         deleteWithdraw(id) {
-            if(!confirm("Supprimer ce mouvement ?")) return;
-            financeFlux = financeFlux.filter(f => f.id !== id);
-            localStorage.setItem(FLUX_KEY, JSON.stringify(financeFlux));
-            this.renderAccounting();
+            if(confirm("Supprimer cette opération financière ?")) {
+                financeFlux = financeFlux.filter(f => f.id !== id);
+                localStorage.setItem(FLUX_KEY, JSON.stringify(financeFlux));
+                this.renderAccounting();
+                
+                // Suppression Cloud
+                if(window.SyncManager) {
+                    window.SyncManager.deleteItem('BONE_FINANCE_FLUX', id);
+                }
+            }
         },
 
         showToast(msg) {
@@ -361,7 +368,6 @@
 
         renderAccounting() {
             userOrders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
-            // Utilisation de la clé BONE_PRODUCTS_LIST pour retrouver le prix d'achat brut
             const catalog = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             
             const period = document.getElementById('periodFilter').value;
@@ -376,10 +382,8 @@
 
             const now = new Date();
             const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-            
             const dayOfWeek = now.getDay() || 7; 
             const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek - 1)).getTime();
-            
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
             const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
 
@@ -394,12 +398,8 @@
             });
 
             table.innerHTML = filteredOrders.map((order) => {
-                // On cherche le produit dans le catalogue par son nom pour récupérer le prix d'achat brut
                 const productInCatalog = catalog.find(p => p.name === order.prodName);
-                
                 let unitAcquisition = 0;
-                // Priorité 1: Prix d'acquisition enregistré directement dans la commande
-                // Priorité 2: Prix d'achat brut (priceBuy) défini dans le catalogue de produits
                 if (order.acquisitionPrice && parseFloat(order.acquisitionPrice) > 0) {
                     unitAcquisition = parseFloat(order.acquisitionPrice);
                 } else if (productInCatalog && productInCatalog.priceBuy) {
@@ -410,17 +410,10 @@
 
                 const quantity = parseInt(order.qty) || 1;
                 const acq = unitAcquisition * quantity;
-
-                const vBase = parseFloat(order.price) || 0;
-                const tPrice = parseFloat(order.transit) || 0;
-                const dPrice = parseFloat(order.douane) || 0;
-                const lPrice = parseFloat(order.livraison) || 0;
-                
-                let payedAmount = 0;
-                if(order.isPricePayed) payedAmount += vBase;
-                if(order.isTransitPayed) payedAmount += tPrice;
-                if(order.isDouanePayed) payedAmount += dPrice;
-                if(order.isLivraisonPayed) payedAmount += lPrice;
+                const payedAmount = (order.isPricePayed ? (parseFloat(order.price)||0) : 0) + 
+                                  (order.isTransitPayed ? (parseFloat(order.transit)||0) : 0) + 
+                                  (order.isDouanePayed ? (parseFloat(order.douane)||0) : 0) + 
+                                  (order.isLivraisonPayed ? (parseFloat(order.livraison)||0) : 0);
 
                 const growth = acq * growthRate;
                 const profit = payedAmount - acq - growth;
@@ -439,7 +432,7 @@
                     <td><div class="fw-bold">${order.prodName}</div><div class="text-muted small">${order.client} (Qté: ${quantity})</div></td>
                     <td class="text-center fw-bold">${payedAmount.toLocaleString()}</td>
                     <td class="text-center">
-                        <input type="number" class="input-acquisition" value="${acq}" readonly title="Prix d'achat unitaire: ${unitAcquisition}">
+                        <input type="number" class="input-acquisition" value="${acq}" readonly>
                     </td>
                     <td class="text-center text-info fw-bold">${Math.round(growth).toLocaleString()}</td>
                     <td class="text-end ${profit >= 0 ? 'benefit-positive' : 'benefit-negative'}">${Math.round(profit).toLocaleString()}</td>
@@ -448,8 +441,8 @@
             }).reverse().join('');
 
             const filteredFlux = financeFlux.filter(f => {
-                if (period === 'all') return true;
                 const fTime = f.timestamp || 0;
+                if (period === 'all') return true;
                 if (period === 'day') return fTime >= startOfDay;
                 if (period === 'week') return fTime >= startOfWeek;
                 if (period === 'month') return fTime >= startOfMonth;
@@ -475,19 +468,14 @@
             document.getElementById('totalSales').innerText = `${stats.sales.toLocaleString()} F`;
             document.getElementById('totalCapitalStock').innerText = `${stats.acq.toLocaleString()} F`;
             document.getElementById('totalGrowthSaving').innerText = `${Math.round(stats.growth).toLocaleString()} F`;
-            
             document.getElementById('totalGrossProfit').innerText = `${Math.round(stats.gross).toLocaleString()} F`;
             document.getElementById('totalWithdrawProfit').innerText = `-${stats.outProfit.toLocaleString()} F`;
             document.getElementById('remainingProfit').innerText = `${Math.round(stats.gross - stats.outProfit).toLocaleString()} F`;
-
-            const totalCapPossible = stats.acq + stats.growth;
-            document.getElementById('theoreticalCapital').innerText = `${Math.round(totalCapPossible).toLocaleString()} F`;
+            document.getElementById('theoreticalCapital').innerText = `${Math.round(stats.acq + stats.growth).toLocaleString()} F`;
             document.getElementById('totalWithdrawCapital').innerText = `-${stats.outCap.toLocaleString()} F`;
-            document.getElementById('remainingCapital').innerText = `${Math.round(totalCapPossible - stats.outCap).toLocaleString()} F`;
+            document.getElementById('remainingCapital').innerText = `${Math.round(stats.acq + stats.growth - stats.outCap).toLocaleString()} F`;
 
-            if(document.getElementById('chartWrapper').style.display === 'block') {
-                this.updateChart(chartData);
-            }
+            if(document.getElementById('chartWrapper').style.display === 'block') this.updateChart(chartData);
         },
 
         updateChart(data) {
@@ -518,9 +506,7 @@
             });
         },
 
-        printPDF() {
-            window.print();
-        }
+        printPDF() { window.print(); }
     };
 
     window.onload = () => Finance.init();
