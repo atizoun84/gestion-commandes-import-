@@ -63,9 +63,6 @@
 
         .associate-row, .momo-row { background: #f8f9fa; border-radius: 15px; padding: 15px; margin-bottom: 10px; border: 1px solid #eee; }
         .locked-mode .associate-row, .locked-mode .momo-row { background: var(--blue-readonly); border: none; }
-        
-        /* Style additionnel pour les notifs */
-        .text-purple { color: var(--canva-purple); }
     </style>
 </head>
 <body>
@@ -80,26 +77,9 @@
                     <span class="promoter-name">Interface de Gestion PDG</span>
                 </div>
             </div>
-
-            <div class="ms-auto d-flex align-items-center">
-                <div class="position-relative d-inline-block me-3" id="adminNotifGroup" style="display:none !important;">
-                    <button class="btn btn-light rounded-circle shadow-sm" data-bs-toggle="dropdown">
-                        <i class="bi bi-bell-fill text-purple"></i>
-                        <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" id="notifList" style="width: 300px; max-height: 400px; overflow-y: auto;">
-                        <li class="dropdown-header">Derniers mouvements</li>
-                        <div id="notifItems"></div>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><button onclick="clearAllNotifs()" class="dropdown-item text-center text-danger fw-bold">Supprimer l'historique (Code requis)</button></li>
-                    </ul>
-                </div>
-
-                <button class="navbar-toggler border-white" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
-                    <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
-                </button>
-            </div>
-
+            <button class="navbar-toggler border-white" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
+            </button>
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto text-end">
                     <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
@@ -200,7 +180,7 @@
                         </button>
                     </div>
                     <div id="associatesContainer">
-                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -215,6 +195,19 @@
                 </button>
             </div>
         </form>
+
+        <div class="mt-5 border-top pt-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h5 fw-bold mb-0">Historique des mouvements</h3>
+                <div>
+                    <button onclick="resetCounter()" class="btn btn-sm btn-light border">Marquer comme lu</button>
+                    <button onclick="clearHistory()" class="btn btn-sm btn-outline-danger ms-2">Vider</button>
+                </div>
+            </div>
+            <ul class="list-group list-group-flush" id="notifHistory">
+                <li class="list-group-item text-center text-muted small">Chargement des mouvements...</li>
+            </ul>
+        </div>
     </div>
 </main>
 
@@ -229,16 +222,62 @@
     </div>
 </footer>
 
+<script type="module">
+    import { db, ref, onValue, update, remove } from './firebase-config.js';
+
+    // Charger l'historique et filtrer
+    onValue(ref(db, 'notifications'), (snapshot) => {
+        const list = document.getElementById('notifHistory');
+        list.innerHTML = "";
+        const data = snapshot.val();
+        
+        if(data) {
+            Object.keys(data).reverse().forEach(id => {
+                const n = data[id];
+                list.innerHTML += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${n.user}</strong>: ${n.type} (${n.details})
+                            <br><small class="text-muted">${new Date(n.timestamp).toLocaleString()}</small>
+                        </div>
+                    </li>`;
+            });
+        } else {
+            list.innerHTML = '<li class="list-group-item text-center text-muted small">Aucun mouvement enregistré</li>';
+        }
+    });
+
+    // Réinitialiser le compteur (Marquer comme lu)
+    window.resetCounter = function() {
+        onValue(ref(db, 'notifications'), (snapshot) => {
+            const updates = {};
+            snapshot.forEach(child => {
+                updates[`notifications/${child.key}/read`] = true;
+            });
+            update(ref(db), updates);
+        }, { onlyOnce: true });
+    };
+
+    // Supprimer historique par code admin
+    window.clearHistory = function() {
+        const code = prompt("Code admin requis :");
+        if(code === "1234") {
+            remove(ref(db, 'notifications'));
+        } else {
+            alert("Code incorrect");
+        }
+    };
+</script>
+
 <script>
     // Vérification stricte Admin
-    const sessionLocal = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
-
-    if (!sessionLocal || sessionLocal.role !== 'admin') {
+    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+    if (!session || session.role !== 'admin') {
         alert("Accès refusé. Seul l'administrateur peut accéder à cette page.");
         window.location.href = 'login.html';
     }
 
-    // Logique PWA : Enregistrement du Service Worker
+    // Logique PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('./sw.js')
@@ -255,27 +294,22 @@
         lock() {
             isLocked = true;
             document.body.classList.add('locked-mode');
-            
             fields.forEach(id => {
                 const el = document.getElementById(id);
                 if(el.tagName === 'SELECT') el.disabled = true;
                 else el.readOnly = true;
             });
-
             document.querySelectorAll('.momo-input').forEach(el => el.readOnly = true);
             document.querySelectorAll('.momo-select').forEach(el => el.disabled = true);
             document.querySelectorAll('.btn-remove-momo').forEach(el => el.classList.add('hidden-el'));
             document.getElementById('addMomo').classList.add('hidden-el');
-
             document.querySelectorAll('.assoc-input').forEach(el => el.readOnly = true);
             document.querySelectorAll('.assoc-select').forEach(el => el.disabled = true);
             document.querySelectorAll('.btn-remove-assoc').forEach(el => el.classList.add('hidden-el'));
             document.getElementById('addAssociate').classList.add('hidden-el');
-
             document.getElementById('uploadZone').classList.add('hidden-el');
             document.getElementById('finalSignature').style.display = 'block';
             document.getElementById('signLabel').classList.remove('d-none');
-            
             const btn = document.getElementById('mainBtn');
             btn.innerHTML = '<i class="bi bi-unlock-fill me-2"></i>Déverrouiller pour modification';
             btn.className = 'btn btn-action btn-unlock w-100 shadow';
@@ -283,27 +317,22 @@
         unlock() {
             isLocked = false;
             document.body.classList.remove('locked-mode');
-            
             fields.forEach(id => {
                 const el = document.getElementById(id);
                 if(el.tagName === 'SELECT') el.disabled = false;
                 else el.readOnly = false;
             });
-
             document.querySelectorAll('.momo-input').forEach(el => el.readOnly = false);
             document.querySelectorAll('.momo-select').forEach(el => el.disabled = false);
             document.querySelectorAll('.btn-remove-momo').forEach(el => el.classList.remove('hidden-el'));
             document.getElementById('addMomo').classList.remove('hidden-el');
-
             document.querySelectorAll('.assoc-input').forEach(el => el.readOnly = false);
             document.querySelectorAll('.assoc-select').forEach(el => el.disabled = false);
             document.querySelectorAll('.btn-remove-assoc').forEach(el => el.classList.remove('hidden-el'));
             document.getElementById('addAssociate').classList.remove('hidden-el');
-
             document.getElementById('uploadZone').classList.remove('hidden-el');
             document.getElementById('finalSignature').style.display = 'none';
             document.getElementById('signLabel').classList.add('d-none');
-            
             const btn = document.getElementById('mainBtn');
             btn.innerHTML = '<i class="bi bi-lock-fill me-2"></i>Sauvegarder et verrouiller';
             btn.className = 'btn btn-action btn-save w-100 shadow';
@@ -365,7 +394,6 @@
         save() {
             const config = {};
             fields.forEach(id => config[id] = document.getElementById(id).value);
-            
             config.momoAccounts = [];
             document.querySelectorAll('.momo-row').forEach(row => {
                 config.momoAccounts.push({
@@ -373,7 +401,6 @@
                     phone: row.querySelector('.momo-input').value
                 });
             });
-
             config.associates = [];
             document.querySelectorAll('.associate-row').forEach(row => {
                 config.associates.push({
@@ -381,7 +408,6 @@
                     phone: row.querySelector('.assoc-input').value
                 });
             });
-
             config.logo = document.getElementById('logoPrev').src;
             config.sign = document.getElementById('signPrev').src;
             localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
@@ -410,17 +436,14 @@
                 return;
             }
             fields.forEach(id => { if(data[id]) document.getElementById(id).value = data[id]; });
-            
             if(data.momoAccounts) {
                 document.getElementById('momoContainer').innerHTML = '';
                 data.momoAccounts.forEach(acc => UI.createMomoRow(acc.network, acc.phone));
             }
-
             if(data.associates) {
                 document.getElementById('associatesContainer').innerHTML = '';
                 data.associates.forEach(assoc => UI.createAssociateRow(assoc.country, assoc.phone));
             }
-
             if(data.companyName) document.getElementById('navCompanyName').innerText = data.companyName;
             this.applyLogos(data.logo, data.sign);
             UI.lock();
@@ -464,52 +487,13 @@
     setupImage('signInp', 'signPrev', 'signPlaceholder');
 
     window.onload = () => Data.load();
-</script>
 
-<script type="module">
-    import { db, ref, onValue, remove } from './firebase-config.js';
-    
-    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
-    if(session && session.role === 'admin') {
-        document.getElementById('adminNotifGroup').style.display = 'inline-block';
-        
-        onValue(ref(db, 'notifications'), (snapshot) => {
-            const data = snapshot.val();
-            const badge = document.getElementById('notifBadge');
-            const container = document.getElementById('notifItems');
-            container.innerHTML = '';
-            
-            if(data) {
-                const list = Object.entries(data).reverse(); 
-                const unreadCount = list.filter(n => !n[1].read).length;
-                
-                badge.innerText = unreadCount;
-                badge.style.display = unreadCount > 0 ? 'block' : 'none';
-
-                list.forEach(([id, notif]) => {
-                    container.innerHTML += `
-                        <li class="p-2 border-bottom">
-                            <small class="text-muted">${new Date(notif.timestamp).toLocaleString()}</small><br>
-                            <strong>${notif.user}</strong>: ${notif.type}<br>
-                            <span class="text-secondary small">${JSON.stringify(notif.details)}</span>
-                        </li>`;
-                });
-            } else {
-                container.innerHTML = '<li class="p-3 text-center text-muted">Aucun mouvement</li>';
-                badge.style.display = 'none';
-            }
-        });
-    }
-
-    window.clearAllNotifs = () => {
-        const code = prompt("Entrez le code Admin pour supprimer l'historique :");
-        if(code === "1234") { 
-            remove(ref(db, 'notifications'));
-            alert("Historique vidé !");
-        } else {
-            alert("Code incorrect !");
+    function logout() {
+        if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
+            localStorage.removeItem('BONE_USER_SESSION');
+            window.location.href = 'login.html';
         }
-    };
+    }
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -518,15 +502,6 @@
 <button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
     <i class="bi bi-power fs-4"></i>
 </button>
-
-<script>
-    function logout() {
-        if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
-            localStorage.removeItem('BONE_USER_SESSION');
-            window.location.href = 'login.html';
-        }
-    }
-</script>
 
 </body>
 </html>

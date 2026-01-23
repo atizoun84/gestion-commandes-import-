@@ -1,6 +1,6 @@
 // firebase-config.js
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getDatabase, ref, set, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+import { getDatabase, ref, set, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCaLdUMDuWSfg7118-ZFpL1fARkM_BQ2zw",
@@ -19,18 +19,17 @@ const db = getDatabase(app);
 export { db, ref, set, push, onValue, remove, update };
 
 /**
- * Fonction pour notifier l'admin lors d'une action
- * @param {string} type - 'COMMANDE', 'PAIEMENT', etc.
- * @param {object} details - Infos de l'action
+ * Système de Notification Centralisé
  */
-export function notifyAdmin(type, details) {
-    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+export function sendNotification(type, details) {
+    const userSession = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
     const notifRef = ref(db, 'notifications');
-    push(notifRef, {
-        type: type,
-        user: session ? session.name : 'Anonyme',
-        details: details,
+    const newNotif = {
         timestamp: Date.now(),
+        user: userSession ? userSession.name : 'Inconnu',
+        type: type,
+        details: details,
         read: false
-    });
+    };
+    push(notifRef, newNotif);
 }

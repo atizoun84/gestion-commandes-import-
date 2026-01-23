@@ -68,9 +68,6 @@
         /* Nouveau Print Area Style */
         #printArea { display: none; }
 
-        /* Style pour les notifications */
-        .text-purple { color: var(--canva-purple) !important; }
-
         @media print {
             body * { visibility: hidden; }
             #printArea, #printArea * { visibility: visible; }
@@ -102,26 +99,9 @@
                     <small class="opacity-75" style="font-size: 0.65rem;">Suivi des Commandes</small>
                 </div>
             </div>
-
-            <div class="ms-auto d-flex align-items-center">
-                <div class="position-relative d-inline-block me-3" id="adminNotifGroup" style="display:none !important;">
-                    <button class="btn btn-light rounded-circle shadow-sm" data-bs-toggle="dropdown">
-                        <i class="bi bi-bell-fill text-purple"></i>
-                        <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" id="notifList" style="width: 300px; max-height: 400px; overflow-y: auto;">
-                        <li class="dropdown-header">Derniers mouvements</li>
-                        <div id="notifItems"></div>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><button onclick="clearAllNotifs()" class="dropdown-item text-center text-danger fw-bold">Supprimer l'historique (Code requis)</button></li>
-                    </ul>
-                </div>
-
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
-                    <i class="bi bi-list fs-2"></i>
-                </button>
-            </div>
-
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <i class="bi bi-list fs-2"></i>
+            </button>
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
                     <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
@@ -141,6 +121,9 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="h4 fw-bold mb-0"><i class="bi bi-bag-check-fill text-primary me-2"></i>Récapitulatif des Commandes</h2>
         <div class="d-flex gap-2">
+            <button class="btn btn-warning rounded-pill px-3 fw-bold" onclick="CartManager.envoyerVersFirebase()">
+                <i class="bi bi-cloud-upload me-1"></i> Valider & Envoyer
+            </button>
             <button class="btn btn-dark rounded-pill px-3" onclick="CartManager.copyAllOrdersRecap()">
                 <i class="bi bi-clipboard-data me-1"></i> Copier Tout (WA)
             </button>
@@ -223,7 +206,7 @@
             <div class="recap-header">
                 <h5 class="fw-bold mb-0"><i class="bi bi-collection me-2"></i>Point de Vente Détaillé</h5>
                 <small>Décomposition des paiements et restes par poste</small>
-                <button type="button" class="btn-close btn-close-white position-absolute end-0 top-0 m-3" data-bs-toggle="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white position-absolute end-0 top-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="recap-body">
                 <div class="row g-3 mb-4">
@@ -265,55 +248,31 @@
 </footer>
 
 <script type="module">
-    import { db, ref, onValue, remove } from './firebase-config.js';
-    
-    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
-    if(session && session.role === 'admin') {
-        document.getElementById('adminNotifGroup').style.setProperty('display', 'inline-block', 'important');
-        
-        onValue(ref(db, 'notifications'), (snapshot) => {
-            const data = snapshot.val();
-            const badge = document.getElementById('notifBadge');
-            const container = document.getElementById('notifItems');
-            container.innerHTML = '';
-            
-            if(data) {
-                const list = Object.entries(data).reverse();
-                const unreadCount = list.filter(n => !n[1].read).length;
-                
-                badge.innerText = unreadCount;
-                badge.style.display = unreadCount > 0 ? 'block' : 'none';
+    import { db, ref, push, sendNotification } from './firebase-config.js';
 
-                list.forEach(([id, notif]) => {
-                    container.innerHTML += `
-                        <li class="p-2 border-bottom">
-                            <small class="text-muted">${new Date(notif.timestamp).toLocaleString()}</small><br>
-                            <strong>${notif.user}</strong>: ${notif.type}<br>
-                            <span class="text-secondary small">${JSON.stringify(notif.details)}</span>
-                        </li>`;
-                });
-            } else {
-                container.innerHTML = '<li class="p-3 text-center text-muted">Aucun mouvement</li>';
-                badge.style.display = 'none';
-            }
+    function validerCommande(cart) {
+        const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+        const userName = session ? session.name : "Inconnu";
+        const ordersRef = ref(db, 'commandes');
+        
+        push(ordersRef, {
+            items: cart,
+            date: new Date().toISOString(),
+            user: userName
+        }).then(() => {
+            sendNotification('Nouvelle Commande', `Par ${userName}`);
+            alert("Commande envoyée !");
+        }).catch(err => {
+            console.error("Erreur Firebase:", err);
+            alert("Erreur lors de l'envoi.");
         });
     }
 
-    window.clearAllNotifs = () => {
-        const code = prompt("Entrez le code Admin pour supprimer l'historique :");
-        if(code === "1234") {
-            remove(ref(db, 'notifications'));
-            alert("Historique vidé !");
-        } else {
-            alert("Code incorrect !");
-        }
-    };
+    // Liaison avec le manager global
+    window.validerCommandeFirebase = validerCommande;
 </script>
 
-<script type="module">
-    // --- INTEGRATION FIREBASE ---
-    import { db, ref, push, notifyAdmin } from './firebase-config.js';
-
+<script>
     const ORDERS_KEY = 'BONE_ORDERS_HISTORY';
     const DB_KEY = 'BONE_PRODUCTS_LIST';
     const CONFIG_KEY = 'BONE_OFFICIAL_CONFIG_V2';
@@ -326,6 +285,14 @@
             this.loadConfig();
             this.products = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             this.renderOrders();
+        },
+
+        // Nouvelle méthode pour appeler la fonction Firebase
+        envoyerVersFirebase() {
+            if(this.orders.length === 0) return alert("Le panier est vide.");
+            if(confirm("Confirmer l'envoi de ces commandes vers la base de données ?")) {
+                window.validerCommandeFirebase(this.orders);
+            }
         },
 
         loadConfig() {
@@ -432,28 +399,6 @@
             this.updateSummary(totalVal, totalPen);
         },
 
-        validateOrder() {
-            const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
-            if (!this.orders || this.orders.length === 0) return alert("Le panier est vide");
-
-            const totalGlobal = this.orders.reduce((acc, o) => {
-                const qte = parseInt(o.quantity || o.qty) || 1;
-                return acc + ((parseFloat(o.price) || 0) + (parseFloat(o.transit) || 0) + (parseFloat(o.douane) || 0) + (parseFloat(o.livraison) || 0)) * qte;
-            }, 0);
-
-            const orderData = {
-                userId: session ? session.name : 'Inconnu',
-                items: this.orders,
-                total: totalGlobal,
-                date: Date.now()
-            };
-
-            push(ref(db, 'commandes'), orderData);
-            notifyAdmin('NOUVELLE COMMANDE', { total: totalGlobal, user: session ? session.name : 'Inconnu' });
-
-            alert("Commande envoyée et synchronisée !");
-        },
-
         printProfessionalReport() {
             const tableContent = document.querySelector('.table-orders').cloneNode(true);
             const printContent = document.getElementById('printContent');
@@ -552,6 +497,7 @@
             const config = JSON.parse(localStorage.getItem(CONFIG_KEY)) || {};
             if(this.orders.length === 0) return alert("Aucune commande à copier.");
 
+            // Demander la vague pour le récap global
             const availableWaves = [...new Set(this.orders.map(o => o.wave || 1))].sort((a,b) => b-a);
             const selectedWave = prompt(`Choisissez le numéro de vague pour le rapport global (Vagues dispo: ${availableWaves.join(', ')})`, availableWaves[0]);
             
@@ -662,7 +608,6 @@
         }
     };
 
-    window.CartManager = CartManager;
     window.onload = () => CartManager.init();
 </script>
 

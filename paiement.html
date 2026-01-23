@@ -87,7 +87,6 @@
         .signature-area { margin-top: 30px; font-style: italic; border-top: 1px solid #eee; padding-top: 10px; }
 
         .btn-settle { padding: 2px 10px; font-size: 0.7rem; border-radius: 20px; float: right; }
-        .text-purple { color: var(--canva-purple); }
     </style>
 </head>
 <body>
@@ -102,26 +101,9 @@
                     <small class="opacity-75" style="font-size: 0.65rem;">Suivi paiement</small>
                 </div>
             </a>
-
-            <div class="ms-auto d-flex align-items-center">
-                <div class="position-relative d-inline-block me-3" id="adminNotifGroup" style="display:none !important;">
-                    <button class="btn btn-light rounded-circle shadow-sm" data-bs-toggle="dropdown">
-                        <i class="bi bi-bell-fill text-purple"></i>
-                        <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" id="notifList" style="width: 300px; max-height: 400px; overflow-y: auto;">
-                        <li class="dropdown-header">Derniers mouvements</li>
-                        <div id="notifItems"></div>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><button onclick="clearAllNotifs()" class="dropdown-item text-center text-danger fw-bold">Supprimer l'historique (Code requis)</button></li>
-                    </ul>
-                </div>
-
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-            </div>
-
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
                     <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
@@ -385,7 +367,7 @@
             userOrders[orderIndex].isPricePayed = (parseFloat(document.getElementById('paidBase').value) >= (parseFloat(userOrders[orderIndex].price) * qte));
             userOrders[orderIndex].isTransitPayed = (parseFloat(document.getElementById('paidTransit').value) >= (parseFloat(userOrders[orderIndex].transit) * qte));
             userOrders[orderIndex].isDouanePayed = (parseFloat(document.getElementById('paidDouane').value) >= (parseFloat(userOrders[orderIndex].douane) * qte));
-            userOrders[orderIndex].isLivraisonPayed = (parseFloat(document.getElementById('paidLivr').value) >= (parseFloat(userOrders[orderIndex].livraison) * qte));
+            userOrders[orderIndex].isLivraisonPayed = (parseFloat(document.getElementById('paidLivraison').value) >= (parseFloat(userOrders[orderIndex].livraison) * qte));
             
             localStorage.setItem(ORDERS_KEY, JSON.stringify(userOrders));
             orderModalObj.hide();
@@ -474,54 +456,6 @@
     window.onload = () => Shop.init();
 </script>
 
-<script type="module">
-    import { db, ref, onValue, remove } from './firebase-config.js';
-    
-    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
-    if(session && session.role === 'admin') {
-        document.getElementById('adminNotifGroup').style.display = 'inline-block';
-        
-        // Écoute en temps réel des notifications
-        onValue(ref(db, 'notifications'), (snapshot) => {
-            const data = snapshot.val();
-            const badge = document.getElementById('notifBadge');
-            const container = document.getElementById('notifItems');
-            container.innerHTML = '';
-            
-            if(data) {
-                const list = Object.entries(data).reverse(); // Plus récents en premier
-                const unreadCount = list.filter(n => !n[1].read).length;
-                
-                badge.innerText = unreadCount;
-                badge.style.display = unreadCount > 0 ? 'block' : 'none';
-
-                list.forEach(([id, notif]) => {
-                    container.innerHTML += `
-                        <li class="p-2 border-bottom">
-                            <small class="text-muted">${new Date(notif.timestamp).toLocaleString()}</small><br>
-                            <strong>${notif.user}</strong>: ${notif.type}<br>
-                            <span class="text-secondary small">${JSON.stringify(notif.details)}</span>
-                        </li>`;
-                });
-            } else {
-                container.innerHTML = '<li class="p-3 text-center text-muted">Aucun mouvement</li>';
-                badge.style.display = 'none';
-            }
-        });
-    }
-
-    // Fonction de suppression sécurisée
-    window.clearAllNotifs = () => {
-        const code = prompt("Entrez le code Admin pour supprimer l'historique :");
-        if(code === "1234") { // Remplacez par votre code secret
-            remove(ref(db, 'notifications'));
-            alert("Historique vidé !");
-        } else {
-            alert("Code incorrect !");
-        }
-    };
-</script>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
@@ -538,14 +472,23 @@
     }
 </script>
 
+
 <button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
     <i class="bi bi-power fs-4"></i>
 </button>
 
 <script>
+    /**
+     * Fonction de déconnexion globale
+     * Supprime la session et redirige vers la page de login
+     */
     function logout() {
+        // Une petite confirmation pour éviter les erreurs de manipulation
         if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
+            // 1. On supprime la clé de session spécifique
             localStorage.removeItem('BONE_USER_SESSION');
+            
+            // 2. Redirection immédiate
             window.location.href = 'login.html';
         }
     }

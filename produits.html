@@ -478,72 +478,15 @@
 </div>
 
 <script type="module">
-    // --- INTEGRATION FIREBASE ---
-    import { db, ref, onValue, set, notifyAdmin } from './firebase-config.js';
-    const PRODS_REF = ref(db, 'catalogue');
+    // --- IMPORTATION FIREBASE ---
+    import { db, ref, set, onValue, remove, sendNotification } from './firebase-config.js';
 
-    // Charger les produits en temps réel
-    onValue(PRODS_REF, (snapshot) => {
-        const productsFromFirebase = snapshot.val() || [];
-        products = productsFromFirebase; // Mise à jour de la variable globale locale
-        Shop.render(); // Rafraîchir l'affichage
-        if(Shop.isAdmin) Shop.renderAdminTable();
-    });
-
-    // Redéfinition de la sauvegarde pour inclure Firebase
-    const originalSave = Shop.saveProduct;
-    Shop.saveProduct = function(e) {
-        if(e) e.preventDefault();
-        
-        // 1. Logique originale de collecte de données
-        const editId = document.getElementById('editProductId').value;
-        const pOld = editId ? products.find(x => x.id == editId) : null;
-
-        const pData = {
-            id: editId ? parseInt(editId) : Date.now(),
-            uniqueId: editId ? pOld.uniqueId : "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase(),
-            currentWave: editId ? (pOld.currentWave || 1) : 1,
-            name: document.getElementById('pName').value,
-            priceBuy: parseFloat(document.getElementById('pPriceBuy').value) || 0,
-            cat: document.getElementById('pCat').value,
-            qualities: document.getElementById('pQualities').value,
-            stock: parseInt(document.getElementById('pStock').value) || 0,
-            minQty: parseInt(document.getElementById('pMinQty').value) || 1,
-            currency: document.getElementById('pCurrency').value,
-            origin: document.getElementById('pOrigin').value,
-            img: document.getElementById('pImgBase64').value || "https://via.placeholder.com/150",
-            canaux: {
-                avion: { vente: parseInt(document.getElementById('pAvionVente').value) || 0, transit: parseInt(document.getElementById('pAvionTransit').value) || 0, douane: parseInt(document.getElementById('pAvionDouane').value) || 0, liv: parseInt(document.getElementById('pAvionLiv').value) || 0 },
-                bateau: { vente: parseInt(document.getElementById('pBateauVente').value) || 0, transit: parseInt(document.getElementById('pBateauTransit').value) || 0, douane: parseInt(document.getElementById('pBateauDouane').value) || 0, liv: parseInt(document.getElementById('pBateauLiv').value) || 0 },
-                direct: { ttc: parseInt(document.getElementById('pDirectTTC').value) || 0, grosTTC: parseInt(document.getElementById('pGrosTTC').value) || 0, grosQty: parseInt(document.getElementById('pGrosQty').value) || 0 }
-            }
-        };
-
-        if(editId) { 
-            const idx = products.findIndex(x => x.id == editId); 
-            products[idx] = pData; 
-        } else { 
-            products.push(pData); 
-        }
-
-        // 2. SAUVEGARDE SUR FIREBASE (La modification demandée)
-        set(PRODS_REF, products); 
-        localStorage.setItem(DB_KEY, JSON.stringify(products)); // Backup local
-        
-        notifyAdmin('MISE À JOUR CATALOGUE', { item: pData.name + (editId ? " (Modifié)" : " (Nouveau)") });
-        
-        bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
-        Shop.init();
-    };
-</script>
-
-<script>
-    // --- Initialisation de la session et restrictions ---
     const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
     if (!session) window.location.href = 'login.html';
 
     function appliquerRestrictions() {
-        if (session.role === 'user') {
+        const sessionActualisee = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+        if (sessionActualisee && sessionActualisee.role === 'user') {
             const addBtn = document.querySelector('[data-bs-target="#addProductModal"], #addProductBtn, #btnFloatAdd');
             if (addBtn) addBtn.style.display = 'none';
 
@@ -560,13 +503,12 @@
     }
 
     const STORAGE_KEY = 'BONE_OFFICIAL_CONFIG_V2';
-    const DB_KEY = 'BONE_PRODUCTS_LIST';
     const CAT_KEY = 'BONE_CATEGORIES_LIST';
     const ORIGIN_KEY = 'BONE_ORIGINS_LIST';
     const SESSION_KEY = 'BONE_USER_SESSION';
     const ORDERS_KEY = 'BONE_ORDERS_HISTORY';
 
-    let products = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+    let products = [];
     let categories = JSON.parse(localStorage.getItem(CAT_KEY)) || ['Énergie', 'Audio', 'Mobilité'];
     let origins = JSON.parse(localStorage.getItem(ORIGIN_KEY)) || ['Chine', 'Dubaï', 'USA', 'Europe'];
     let orders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
@@ -580,9 +522,19 @@
             this.checkSession();
             this.renderCategories();
             this.renderOrigins();
-            this.render();
             this.loadBrandConfig();
-            appliquerRestrictions();
+            
+            // ÉCOUTE FIREBASE EN TEMPS RÉEL (Correctif chargement instantané)
+            onValue(ref(db, 'produits'), (snapshot) => {
+                const data = snapshot.val();
+                products = data ? Object.values(data) : [];
+                this.render();
+                if(this.isAdmin) {
+                    this.renderAdminTable();
+                    this.renderOrdersTable();
+                }
+                appliquerRestrictions();
+            });
         },
 
         checkSession() {
@@ -602,11 +554,6 @@
                 document.querySelector('.nav-home')?.style.setProperty('display', 'none', 'important');
                 document.querySelector('.nav-cart')?.style.setProperty('display', 'none', 'important');
                 document.querySelector('.nav-pay')?.style.setProperty('display', 'none', 'important');
-            }
-
-            if(this.isAdmin) {
-                this.renderAdminTable();
-                this.renderOrdersTable();
             }
         },
 
@@ -642,7 +589,7 @@
                         ${c}
                         ${this.isAdmin ? `<i class="bi bi-x-circle btn-del-cat" onclick="event.stopPropagation(); Shop.deleteCategory('${c}')"></i>` : ''}
                     </div>`).join('');
-            select.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+            if(select) select.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
         },
 
         addNewCategory() {
@@ -660,7 +607,7 @@
 
         renderOrigins() {
             const select = document.getElementById('pOrigin');
-            select.innerHTML = origins.map(o => `<option value="${o}">${o}</option>`).join('');
+            if(select) select.innerHTML = origins.map(o => `<option value="${o}">${o}</option>`).join('');
         },
 
         addNewOrigin() {
@@ -681,6 +628,7 @@
 
         render(items = products) {
             const grid = document.getElementById('productGrid');
+            if(!grid) return;
             grid.innerHTML = items.map(p => {
                 let displayPrice = "N/D";
                 if(p.canaux) {
@@ -711,7 +659,6 @@
                     </div>
                 </div>`;
             }).join('');
-            appliquerRestrictions();
         },
 
         openOrderModal(id) {
@@ -898,7 +845,7 @@
                 const idx = products.findIndex(x => x.id === currentProduct.id);
                 if(idx !== -1) {
                     products[idx].stock -= newOrder.qty;
-                    localStorage.setItem(DB_KEY, JSON.stringify(products));
+                    set(ref(db, 'produits/' + products[idx].id), products[idx]);
                 }
             }
 
@@ -923,7 +870,7 @@
 
                 if (totalInWave >= minQty) {
                     products[productIdx].currentWave = currentWave + 1;
-                    localStorage.setItem(DB_KEY, JSON.stringify(products));
+                    set(ref(db, 'produits/' + productId), products[productIdx]);
                 }
             }
         },
@@ -965,6 +912,50 @@
             new bootstrap.Modal(document.getElementById('addModal')).show();
         },
 
+        saveProduct(e) {
+            if(e) { e.preventDefault(); e.stopPropagation(); }
+            const btnSave = document.getElementById('btnSaveMain');
+            btnSave.disabled = true;
+            btnSave.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Traitement...';
+
+            try {
+                const editId = document.getElementById('editProductId').value;
+                const pOld = editId ? products.find(x => x.id == editId) : null;
+
+                const pData = {
+                    id: editId ? parseInt(editId) : Date.now(),
+                    uniqueId: editId ? pOld.uniqueId : "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase(),
+                    currentWave: editId ? (pOld.currentWave || 1) : 1,
+                    name: document.getElementById('pName').value,
+                    priceBuy: parseFloat(document.getElementById('pPriceBuy').value) || 0,
+                    cat: document.getElementById('pCat').value,
+                    qualities: document.getElementById('pQualities').value,
+                    stock: parseInt(document.getElementById('pStock').value) || 0,
+                    minQty: parseInt(document.getElementById('pMinQty').value) || 1,
+                    currency: document.getElementById('pCurrency').value,
+                    origin: document.getElementById('pOrigin').value,
+                    img: document.getElementById('pImgBase64').value || "https://via.placeholder.com/150",
+                    canaux: {
+                        avion: { vente: parseInt(document.getElementById('pAvionVente').value) || 0, transit: parseInt(document.getElementById('pAvionTransit').value) || 0, douane: parseInt(document.getElementById('pAvionDouane').value) || 0, liv: parseInt(document.getElementById('pAvionLiv').value) || 0 },
+                        bateau: { vente: parseInt(document.getElementById('pBateauVente').value) || 0, transit: parseInt(document.getElementById('pBateauTransit').value) || 0, douane: parseInt(document.getElementById('pBateauDouane').value) || 0, liv: parseInt(document.getElementById('pBateauLiv').value) || 0 },
+                        direct: { ttc: parseInt(document.getElementById('pDirectTTC').value) || 0, grosTTC: parseInt(document.getElementById('pGrosTTC').value) || 0, grosQty: parseInt(document.getElementById('pGrosQty').value) || 0 }
+                    }
+                };
+                
+                const prodRef = ref(db, 'produits/' + pData.id);
+                set(prodRef, pData).then(() => {
+                    sendNotification('Mouvement Produit', `${pData.name} - Enregistré`);
+                    bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
+                });
+
+            } catch (err) {
+                alert("Une erreur est survenue lors de l'enregistrement.");
+            } finally {
+                btnSave.disabled = false;
+                btnSave.innerHTML = 'ENREGISTRER';
+            }
+        },
+
         showDetails(id) {
             const p = products.find(x => x.id === id);
             if(!p) return;
@@ -981,11 +972,11 @@
             else { waveBadge.style.display = "none"; }
 
             const totalInWave = orders.filter(o => o.prodId === p.id && o.wave === wave).reduce((sum, o) => sum + (parseInt(o.qty) || 0), 0);
-            const minTarget = parseInt(p.minQty) || 1;
+            const minT = parseInt(p.minQty) || 1;
 
             const stockDiv = document.getElementById('modalStockDisplay');
             if(p.stock && p.stock > 0) { stockDiv.innerHTML = `<span class="stock-badge bg-success text-white">📦 STOCK DISPONIBLE : ${p.stock}</span>`; }
-            else { stockDiv.innerHTML = `<span class="stock-badge bg-warning text-dark">⏳ SUR COMMANDE (${totalInWave}/${minTarget})</span>`; }
+            else { stockDiv.innerHTML = `<span class="stock-badge bg-warning text-dark">⏳ SUR COMMANDE (${totalInWave}/${minT})</span>`; }
 
             let htmlPrices = "";
             const curr = p.currency || 'F CFA';
@@ -1004,7 +995,6 @@
             document.getElementById('modalPriceList').innerHTML = htmlPrices || "<p class='text-muted'>Aucun prix configuré</p>";
             this.loadBrandConfig();
             new bootstrap.Modal(document.getElementById('productModal')).show();
-            appliquerRestrictions();
         },
 
         getPublishText() {
@@ -1013,7 +1003,11 @@
             const wave = p.currentWave || 1;
             const totalInWave = orders.filter(o => o.prodId === p.id && o.wave === wave).reduce((sum, o) => sum + (parseInt(o.qty) || 0), 0);
             const minT = parseInt(p.minQty) || 1;
-            const stockTxt = (p && p.stock > 0) ? `✅ Stock : ${p.stock}` : `⏳ Sur commande (${totalInWave}/${minT} - Vague ${wave})`;
+            
+            // Correction progression commandes
+            const progressionStr = minT > 1 ? `(${totalInWave}/${minT} - V${wave})` : "";
+            const stockTxt = (p && p.stock > 0) ? `✅ Stock : ${p.stock}` : `⏳ Sur commande ${progressionStr}`;
+            
             const phoneForLink = (config.ceoWhatsapp || "").replace(/\s+/g, '').replace('+', '');
             const curr = p.currency || 'F CFA';
             let priceTxt = "";
@@ -1046,16 +1040,16 @@
 
         deleteCurrentProduct() {
             if(confirm("Supprimer ?")) {
-                const id = parseInt(document.getElementById('currentProductId').value);
-                products = products.filter(p => p.id !== id);
-                localStorage.setItem(DB_KEY, JSON.stringify(products));
-                bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
-                this.init();
+                const id = document.getElementById('currentProductId').value;
+                remove(ref(db, 'produits/' + id)).then(() => {
+                    bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
+                });
             }
         },
 
         renderAdminTable() {
             const tbody = document.getElementById('adminProductTable');
+            if(!tbody) return;
             tbody.innerHTML = products.map(p => `
                 <tr>
                     <td><code class="small">${p.uniqueId}</code></td>
@@ -1099,11 +1093,13 @@
             clone.id = Date.now();
             clone.uniqueId = "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase();
             clone.name += " (Copie)"; clone.currentWave = 1;
-            products.push(clone); localStorage.setItem(DB_KEY, JSON.stringify(products)); this.init();
+            set(ref(db, 'produits/' + clone.id), clone);
         },
 
         deleteProduct(id) {
-            if(confirm("Supprimer ?")) { products = products.filter(p => p.id !== id); localStorage.setItem(DB_KEY, JSON.stringify(products)); this.init(); }
+            if(confirm("Supprimer ?")) {
+                remove(ref(db, 'produits/' + id));
+            }
         },
 
         search() { const q = document.getElementById('searchInput').value.toLowerCase(); this.render(products.filter(p => p.name.toLowerCase().includes(q))); },
@@ -1115,19 +1111,28 @@
         }
     };
 
-    document.getElementById('pImgFile').onchange = function(e) {
-        const file = e.target.files[0];
-        if(!file) return;
-        const reader = new FileReader();
-        reader.onload = function(event) { document.getElementById('pImgBase64').value = event.target.result; };
-        reader.readAsDataURL(file);
-    };
+    window.Shop = Shop;
 
-    document.getElementById('addProductForm').onsubmit = function(e) {
-        Shop.saveProduct(e);
-    };
+    const imgInput = document.getElementById('pImgFile');
+    if(imgInput) {
+        imgInput.onchange = function(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(event) { document.getElementById('pImgBase64').value = event.target.result; };
+            reader.readAsDataURL(file);
+        };
+    }
+
+    const addForm = document.getElementById('addProductForm');
+    if(addForm) {
+        addForm.onsubmit = function(e) {
+            Shop.saveProduct(e);
+        };
+    }
 
     window.onload = () => { Shop.init(); };
+
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
