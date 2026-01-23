@@ -58,10 +58,8 @@
         }
         @keyframes fadeInSuccess { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        /* Style pour masquer le graphique */
         #chartWrapper { display: none; }
 
-        /* Styles Impression Optimisés */
         #printHeader, #printFooter, #summaryPrint { display: none; }
         @media print {
             @page { size: auto; margin: 10mm; }
@@ -75,6 +73,10 @@
             .table { width: 100%; border-collapse: collapse; page-break-inside: auto; font-size: 9pt; }
             th, td { border: 1px solid #ddd !important; padding: 4px !important; }
         }
+
+        /* STYLE MODALE NOTIFICATION RAFFINÉE */
+        .notif-card { border-radius: 15px; transition: 0.2s; border: none; margin-bottom: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .notif-unread { border-left: 5px solid var(--canva-purple) !important; background: #f8f0ff; }
     </style>
 </head>
 <body>
@@ -118,11 +120,11 @@
         <div class="row g-3 align-items-center">
             <div class="col-md-4">
                 <label class="small fw-bold">Taux d'Épargne Croissance (%)</label>
-                <input type="number" id="growthRate" class="form-control" value="10" onchange="Finance.renderAccounting()">
+                <input type="number" id="growthRate" class="form-control" value="10">
             </div>
             <div class="col-md-4">
                 <label class="small fw-bold">Période du Bilan</label>
-                <select id="periodFilter" class="form-select" onchange="Finance.renderAccounting()">
+                <select id="periodFilter" class="form-select">
                     <option value="all">Tout l'historique</option>
                     <option value="day">Aujourd'hui</option>
                     <option value="week">Cette Semaine</option>
@@ -131,7 +133,7 @@
                 </select>
             </div>
             <div class="col-md-4 d-flex gap-2 pt-3">
-                <button class="btn btn-dark w-100" onclick="Finance.printPDF()"><i class="bi bi-file-earmark-pdf"></i> Imprimer Bilan</button>
+                <button class="btn btn-dark w-100" id="printBtn"><i class="bi bi-file-earmark-pdf"></i> Imprimer Bilan</button>
             </div>
         </div>
     </div>
@@ -178,7 +180,7 @@
     </div>
 
     <div class="text-center mb-3 no-print">
-        <button class="btn btn-sm btn-outline-secondary rounded-pill px-4" id="toggleChartBtn" onclick="Finance.toggleChart()">
+        <button class="btn btn-sm btn-outline-secondary rounded-pill px-4" id="toggleChartBtn">
             <i class="bi bi-graph-up me-2"></i>Afficher le graphique d'évolution
         </button>
     </div>
@@ -199,7 +201,7 @@
                 <div class="input-group input-group-sm mb-2">
                     <input type="number" id="outProfitAmt" class="form-control" placeholder="Montant">
                     <input type="text" id="outProfitMotif" class="form-control" placeholder="Motif">
-                    <button class="btn btn-danger" onclick="Finance.addWithdraw('profit')">OK</button>
+                    <button class="btn btn-danger" id="addProfitW">OK</button>
                 </div>
             </div>
         </div>
@@ -209,7 +211,7 @@
                 <div class="input-group input-group-sm mb-2">
                     <input type="number" id="outCapAmt" class="form-control" placeholder="Montant">
                     <input type="text" id="outCapMotif" class="form-control" placeholder="Motif">
-                    <button class="btn btn-warning" onclick="Finance.addWithdraw('capital')">OK</button>
+                    <button class="btn btn-warning" id="addCapW">OK</button>
                 </div>
             </div>
         </div>
@@ -266,17 +268,59 @@
     </div>
 </main>
 
+<div id="adminNotifyBtn" class="position-fixed bottom-0 start-0 m-3 d-none" style="z-index: 2001;">
+    <button class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center" 
+            style="width: 60px; height: 60px; background: var(--canva-gradient); border: 2px solid white;"
+            id="openNotifBtn">
+        <i class="bi bi-bell-fill fs-4"></i>
+        <span id="notifCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+    </button>
+</div>
+
+<div class="modal fade" id="notifModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 25px;">
+            <div class="modal-header border-0 text-white" style="background: var(--canva-gradient); border-radius: 25px 25px 0 0;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-activity me-2"></i>Flux d'activités Temps Réel</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="d-flex justify-content-between mb-3">
+                    <input type="text" id="notifFilter" class="form-control rounded-pill w-50" placeholder="Filtrer par utilisateur...">
+                    <button class="btn btn-outline-danger btn-sm rounded-pill" id="clearNotifBtn">Réinitialiser (Code Admin)</button>
+                </div>
+                <div id="notifList" style="max-height: 400px; overflow-y: auto;"></div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
+    <i class="bi bi-power fs-4"></i>
+</button>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    // Vérification stricte Admin
-    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
 
-    if (!session || session.role !== 'admin') {
-        alert("Accès refusé. Seul l'administrateur peut accéder à cette page.");
-        window.location.href = 'login.html';
-    }
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue, push, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // Configuration des clés de stockage synchronisées
+    const firebaseConfig = {
+        apiKey: "AIzaSyCaLdUMDuWSfg7118-ZFpL1fARkM_BQ2zw",
+        authDomain: "b-one-database.firebaseapp.com",
+        projectId: "b-one-database",
+        storageBucket: "b-one-database.firebasestorage.app",
+        messagingSenderId: "423962812169",
+        appId: "1:423962812169:web:34961a338fe06e693e7dd8",
+        databaseURL: "https://b-one-database-default-rtdb.firebaseio.com/"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
     const STORAGE_KEY = 'BONE_OFFICIAL_CONFIG_V2';
     const ORDERS_KEY = 'BONE_ORDERS_HISTORY'; 
     const FLUX_KEY = 'BONE_FINANCE_FLUX'; 
@@ -285,10 +329,28 @@
     let financeFlux = JSON.parse(localStorage.getItem(FLUX_KEY)) || [];
     let myChart = null;
 
-    const Finance = {
+    // --- LOGIQUE FINANCIÈRE ---
+    window.Finance = {
         init() {
             this.loadBranding();
             document.getElementById('currentPrintDate').innerText = new Date().toLocaleString('fr-FR');
+            
+            // Écoute Firebase pour synchroniser les données financières partout
+            onValue(ref(db, 'financeFlux'), (snapshot) => {
+                const data = snapshot.val();
+                financeFlux = data ? Object.values(data) : [];
+                localStorage.setItem(FLUX_KEY, JSON.stringify(financeFlux));
+                this.renderAccounting();
+            });
+
+            // Écoute des commandes
+            onValue(ref(db, 'orders'), (snapshot) => {
+                const data = snapshot.val();
+                const orders = data ? Object.values(data) : [];
+                localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+                this.renderAccounting();
+            });
+
             this.renderAccounting();
         },
 
@@ -299,12 +361,8 @@
                     document.getElementById('navCompanyName').innerText = config.companyName;
                     document.getElementById('printTitle').innerText = config.companyName;
                 }
-                if(config.ceoName) {
-                    document.getElementById('ceoPrint').innerText = config.ceoName;
-                }
-                if(config.logo) {
-                    document.getElementById('navLogo').src = config.logo;
-                }
+                if(config.ceoName) document.getElementById('ceoPrint').innerText = config.ceoName;
+                if(config.logo) document.getElementById('navLogo').src = config.logo;
             }
         },
 
@@ -329,27 +387,25 @@
 
             if(!amount || !motif) return alert("Veuillez remplir le montant et le motif");
 
-            financeFlux.push({
-                id: Date.now(),
+            const newId = Date.now();
+            const entry = {
+                id: newId,
                 type: type,
                 amount: amount,
                 motif: motif,
                 date: new Date().toLocaleDateString('fr-FR'),
                 timestamp: Date.now()
-            });
+            };
 
-            localStorage.setItem(FLUX_KEY, JSON.stringify(financeFlux));
+            set(ref(db, 'financeFlux/' + newId), entry);
             document.getElementById(amtId).value = '';
             document.getElementById(motifId).value = '';
             this.showToast("Mouvement enregistré");
-            this.renderAccounting();
         },
 
         deleteWithdraw(id) {
             if(confirm("Supprimer cette opération financière ?")) {
-                financeFlux = financeFlux.filter(f => f.id !== id);
-                localStorage.setItem(FLUX_KEY, JSON.stringify(financeFlux));
-                this.renderAccounting();
+                remove(ref(db, 'financeFlux/' + id));
             }
         },
 
@@ -362,174 +418,133 @@
         renderAccounting() {
             const userOrders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
             const catalog = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            
             const period = document.getElementById('periodFilter').value;
             const growthRate = parseFloat(document.getElementById('growthRate').value) / 100 || 0;
             const table = document.getElementById('accountingTable');
             
-            let stats = {
-                sales: 0, acq: 0, growth: 0, gross: 0,
-                outProfit: 0, outCap: 0
-            };
+            let stats = { sales: 0, acq: 0, growth: 0, gross: 0, outProfit: 0, outCap: 0 };
             let chartData = {};
-
             const now = new Date();
             const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-            const dayOfWeek = now.getDay() || 7; 
-            const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dayOfWeek - 1)).getTime();
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-            const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
 
-            const filteredOrders = userOrders.filter(o => {
+            table.innerHTML = userOrders.filter(o => {
                 if (period === 'all') return true;
-                const oTime = o.timestamp ? new Date(o.timestamp).getTime() : 0;
+                const oTime = o.timestamp || 0;
                 if (period === 'day') return oTime >= startOfDay;
-                if (period === 'week') return oTime >= startOfWeek;
-                if (period === 'month') return oTime >= startOfMonth;
-                if (period === 'year') return oTime >= startOfYear;
-                return true;
-            });
-
-            table.innerHTML = filteredOrders.map((order) => {
-                const productInCatalog = catalog.find(p => p.id === order.prodId || p.name === order.prodName);
-                
-                // Calcul du prix d'acquisition unitaire
-                let unitAcquisition = 0;
-                if (order.acquisitionPrice && parseFloat(order.acquisitionPrice) > 0) {
-                    unitAcquisition = parseFloat(order.acquisitionPrice);
-                } else if (productInCatalog && productInCatalog.priceBuy) {
-                    unitAcquisition = parseFloat(productInCatalog.priceBuy);
-                } else if (order.rawPrice) {
-                    unitAcquisition = parseFloat(order.rawPrice);
-                }
-
-                const quantity = parseInt(order.qty || order.quantity) || 1;
-                const acqTotal = unitAcquisition * quantity;
-
-                // Calcul du montant payé par le client (Vente + Transit + Douane + Livraison si payés)
-                const payedAmount = ((order.isPricePayed ? (parseFloat(order.price)||0) : 0) + 
-                                  (order.isTransitPayed ? (parseFloat(order.transit)||0) : 0) + 
-                                  (order.isDouanePayed ? (parseFloat(order.douane)||0) : 0) + 
-                                  (order.isLivraisonPayed ? (parseFloat(order.livraison)||0) : 0)) * quantity;
-
+                return true; 
+            }).map((order) => {
+                const pCat = catalog.find(p => p.id === order.prodId);
+                let unitAcq = order.acquisitionPrice || (pCat ? pCat.priceBuy : 0);
+                const quantity = order.qty || 1;
+                const acqTotal = unitAcq * quantity;
+                const payed = ((order.isPricePayed ? (order.price||0) : 0) + (order.isTransitPayed ? (order.transit||0) : 0)) * quantity;
                 const growth = acqTotal * growthRate;
-                const profit = payedAmount - acqTotal - growth;
+                const profit = payed - acqTotal - growth;
 
-                stats.sales += payedAmount; 
-                stats.acq += acqTotal; 
-                stats.growth += growth; 
-                stats.gross += profit;
+                stats.sales += payed; stats.acq += acqTotal; stats.growth += growth; stats.gross += profit;
+                const dStr = order.timestamp ? new Date(order.timestamp).toLocaleDateString('fr-FR') : '-';
+                if(dStr !== '-') chartData[dStr] = (chartData[dStr] || 0) + profit;
 
-                const dateStr = order.timestamp ? new Date(order.timestamp).toLocaleDateString('fr-FR') : '-';
-                if(dateStr !== '-') chartData[dateStr] = (chartData[dateStr] || 0) + profit;
-
-                return `
-                <tr>
-                    <td class="text-muted" style="font-size: 0.7rem;">${dateStr}</td>
-                    <td><div class="fw-bold">${order.prodName}</div><div class="text-muted small">${order.client} (Qté: ${quantity})</div></td>
-                    <td class="text-center fw-bold">${payedAmount.toLocaleString()}</td>
-                    <td class="text-center">
-                        <input type="number" class="input-acquisition" value="${acqTotal}" readonly>
-                    </td>
-                    <td class="text-center text-info fw-bold">${Math.round(growth).toLocaleString()}</td>
-                    <td class="text-end ${profit >= 0 ? 'benefit-positive' : 'benefit-negative'}">${Math.round(profit).toLocaleString()}</td>
-                    <td class="text-end no-print"><i class="bi bi-lock-fill text-muted"></i></td>
-                </tr>`;
+                return `<tr><td class="text-muted small">${dStr}</td><td><b>${order.prodName}</b><br><small>${order.client}</small></td><td class="text-center fw-bold">${payed.toLocaleString()}</td><td class="text-center">${acqTotal.toLocaleString()}</td><td class="text-center text-info">${Math.round(growth).toLocaleString()}</td><td class="text-end ${profit>=0?'benefit-positive':'benefit-negative'}">${Math.round(profit).toLocaleString()}</td><td class="text-end no-print"><i class="bi bi-lock-fill"></i></td></tr>`;
             }).reverse().join('');
 
-            const filteredFlux = financeFlux.filter(f => {
-                const fTime = f.timestamp || 0;
-                if (period === 'all') return true;
-                if (period === 'day') return fTime >= startOfDay;
-                if (period === 'week') return fTime >= startOfWeek;
-                if (period === 'month') return fTime >= startOfMonth;
-                if (period === 'year') return fTime >= startOfYear;
-                return true;
-            });
-
-            const logTable = document.getElementById('withdrawLogs');
-            logTable.innerHTML = filteredFlux.map(f => {
-                if(f.type === 'profit') stats.outProfit += f.amount;
-                else stats.outCap += f.amount;
-                return `
-                <tr>
-                    <td><span class="badge ${f.type==='profit'?'bg-danger':'bg-warning text-dark'}">${f.type.toUpperCase()}</span></td>
-                    <td>${f.motif} <br><small class="text-muted">${f.date}</small></td>
-                    <td class="text-end fw-bold">-${f.amount.toLocaleString()}</td>
-                    <td class="text-end no-print">
-                        <button class="btn btn-sm text-muted" onclick="Finance.deleteWithdraw(${f.id})"><i class="bi bi-trash"></i></button>
-                    </td>
-                </tr>`;
+            document.getElementById('withdrawLogs').innerHTML = financeFlux.map(f => {
+                if(f.type === 'profit') stats.outProfit += f.amount; else stats.outCap += f.amount;
+                return `<tr><td><span class="badge ${f.type==='profit'?'bg-danger':'bg-warning text-dark'}">${f.type}</span></td><td>${f.motif}</td><td class="text-end">-${f.amount.toLocaleString()}</td><td class="text-end no-print"><button class="btn btn-sm" onclick="Finance.deleteWithdraw(${f.id})"><i class="bi bi-trash"></i></button></td></tr>`;
             }).join('');
 
-            // Mise à jour de l'affichage global
             document.getElementById('totalSales').innerText = `${Math.round(stats.sales).toLocaleString()} F`;
-            document.getElementById('totalCapitalStock').innerText = `${Math.round(stats.acq).toLocaleString()} F`;
-            document.getElementById('totalGrowthSaving').innerText = `${Math.round(stats.growth).toLocaleString()} F`;
             document.getElementById('totalGrossProfit').innerText = `${Math.round(stats.gross).toLocaleString()} F`;
-            document.getElementById('totalWithdrawProfit').innerText = `-${stats.outProfit.toLocaleString()} F`;
             document.getElementById('remainingProfit').innerText = `${Math.round(stats.gross - stats.outProfit).toLocaleString()} F`;
-            document.getElementById('theoreticalCapital').innerText = `${Math.round(stats.acq + stats.growth).toLocaleString()} F`;
-            document.getElementById('totalWithdrawCapital').innerText = `-${stats.outCap.toLocaleString()} F`;
             document.getElementById('remainingCapital').innerText = `${Math.round(stats.acq + stats.growth - stats.outCap).toLocaleString()} F`;
-
-            if(document.getElementById('chartWrapper').style.display === 'block') this.updateChart(chartData);
+            if(myChart || document.getElementById('chartWrapper').style.display === 'block') this.updateChart(chartData);
         },
 
         updateChart(data) {
             const ctx = document.getElementById('evolutionChart').getContext('2d');
             if(myChart) myChart.destroy();
-            const labels = Object.keys(data).sort((a,b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-')));
-            const values = labels.map(label => data[label]);
-
             myChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: labels,
-                    datasets: [{ 
-                        label: 'Performance Marge Réelle', 
-                        data: values, 
-                        borderColor: '#7d2ae8', 
-                        tension: 0.3, 
-                        fill: true, 
-                        backgroundColor: 'rgba(125, 42, 232, 0.05)', 
-                        pointRadius: 3 
-                    }]
+                    labels: Object.keys(data),
+                    datasets: [{ label: 'Marge', data: Object.values(data), borderColor: '#7d2ae8', tension: 0.3, fill: true, backgroundColor: 'rgba(125, 42, 232, 0.05)' }]
                 },
-                options: { 
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
-                }
+                options: { responsive: true, maintainAspectRatio: false }
             });
         },
-
         printPDF() { window.print(); }
     };
 
-    window.onload = () => Finance.init();
-</script>
-</body>
+    // --- LOGIQUE NOTIFICATIONS ADMIN ---
+    window.AdminNotif = {
+        list: [],
+        init() {
+            const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+            if (session && session.role === 'admin') {
+                document.getElementById('adminNotifyBtn').classList.remove('d-none');
+                this.listen();
+            }
+        },
+        listen() {
+            onValue(ref(db, 'notifications'), (snapshot) => {
+                const data = snapshot.val();
+                this.list = data ? Object.entries(data).map(([id, val]) => ({id, ...val})).reverse() : [];
+                const unread = this.list.filter(n => !n.read).length;
+                const badge = document.getElementById('notifCount');
+                badge.innerText = unread;
+                badge.classList.toggle('d-none', unread === 0);
+                this.render();
+            });
+        },
+        render() {
+            const container = document.getElementById('notifList');
+            const filter = document.getElementById('notifFilter').value.toLowerCase();
+            container.innerHTML = this.list
+                .filter(n => n.userId.toLowerCase().includes(filter))
+                .map(n => `
+                    <div class="card notif-card ${!n.read ? 'notif-unread' : 'bg-light'}">
+                        <div class="card-body d-flex justify-content-between align-items-center p-3">
+                            <div>
+                                <h6 class="mb-1 fw-bold">${n.details}</h6>
+                                <small class="text-muted">Utilisateur: <b>${n.userId}</b> | ${new Date(n.timestamp).toLocaleString()}</small>
+                            </div>
+                            ${!n.read ? `<button class="btn btn-sm btn-primary rounded-pill" onclick="AdminNotif.markRead('${n.id}')">Lu</button>` : '<i class="bi bi-check-all text-success"></i>'}
+                        </div>
+                    </div>
+                `).join('');
+        },
+        markRead(id) { update(ref(db, 'notifications/' + id), { read: true }); },
+        clearHistory() {
+            if(prompt("Code Admin ?") === "0000") remove(ref(db, 'notifications'));
+        },
+        openModal() { new bootstrap.Modal(document.getElementById('notifModal')).show(); }
+    };
 
-<button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
-    <i class="bi bi-power fs-4"></i>
-</button>
+    // Attacher les événements
+    document.getElementById('growthRate').onchange = () => Finance.renderAccounting();
+    document.getElementById('periodFilter').onchange = () => Finance.renderAccounting();
+    document.getElementById('printBtn').onclick = () => Finance.printPDF();
+    document.getElementById('toggleChartBtn').onclick = () => Finance.toggleChart();
+    document.getElementById('addProfitW').onclick = () => Finance.addWithdraw('profit');
+    document.getElementById('addCapW').onclick = () => Finance.addWithdraw('capital');
+    document.getElementById('openNotifBtn').onclick = () => AdminNotif.openModal();
+    document.getElementById('notifFilter').oninput = () => AdminNotif.render();
+    document.getElementById('clearNotifBtn').onclick = () => AdminNotif.clearHistory();
+
+    window.Finance = Finance;
+    window.AdminNotif = AdminNotif;
+    Finance.init();
+    AdminNotif.init();
+
+</script>
 
 <script>
-    /**
-     * Fonction de déconnexion globale
-     * Supprime la session et redirige vers la page de login
-     */
     function logout() {
-        // Une petite confirmation pour éviter les erreurs de manipulation
         if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
-            // 1. On supprime la clé de session spécifique
             localStorage.removeItem('BONE_USER_SESSION');
-            
-            // 2. Redirection immédiate
             window.location.href = 'login.html';
         }
     }
 </script>
-
+</body>
 </html>

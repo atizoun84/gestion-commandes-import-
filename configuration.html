@@ -180,7 +180,7 @@
                         </button>
                     </div>
                     <div id="associatesContainer">
-                    </div>
+                        </div>
                 </div>
             </div>
 
@@ -195,19 +195,6 @@
                 </button>
             </div>
         </form>
-
-        <div class="mt-5 border-top pt-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h3 class="h5 fw-bold mb-0">Historique des mouvements</h3>
-                <div>
-                    <button onclick="resetCounter()" class="btn btn-sm btn-light border">Marquer comme lu</button>
-                    <button onclick="clearHistory()" class="btn btn-sm btn-outline-danger ms-2">Vider</button>
-                </div>
-            </div>
-            <ul class="list-group list-group-flush" id="notifHistory">
-                <li class="list-group-item text-center text-muted small">Chargement des mouvements...</li>
-            </ul>
-        </div>
     </div>
 </main>
 
@@ -222,178 +209,105 @@
     </div>
 </footer>
 
+<div id="adminNotifyBtn" class="position-fixed bottom-0 start-0 m-3 d-none" style="z-index: 2001;">
+    <button class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center" 
+            style="width: 60px; height: 60px; background: var(--canva-gradient); border: 2px solid white;"
+            onclick="AdminNotif.openModal()">
+        <i class="bi bi-bell-fill fs-4"></i>
+        <span id="notifCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+    </button>
+</div>
+
+<div class="modal fade" id="notifModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+            <div class="modal-header border-0 text-white" style="background: var(--canva-gradient); border-radius: 20px 20px 0 0;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-activity me-2"></i>Mouvements Temps Réel</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="d-flex justify-content-between mb-3">
+                    <input type="text" id="notifFilter" class="form-control rounded-pill w-50" placeholder="Filtrer par utilisateur..." oninput="AdminNotif.render()">
+                    <button class="btn btn-outline-danger btn-sm rounded-pill" onclick="AdminNotif.clearHistory()">Effacer Historique (Admin)</button>
+                </div>
+                <div id="notifList" style="max-height: 400px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script type="module">
-    import { db, ref, onValue, update, remove } from './firebase-config.js';
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue, update, remove, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // Charger l'historique et filtrer
-    onValue(ref(db, 'notifications'), (snapshot) => {
-        const list = document.getElementById('notifHistory');
-        list.innerHTML = "";
-        const data = snapshot.val();
-        
-        if(data) {
-            Object.keys(data).reverse().forEach(id => {
-                const n = data[id];
-                list.innerHTML += `
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>${n.user}</strong>: ${n.type} (${n.details})
-                            <br><small class="text-muted">${new Date(n.timestamp).toLocaleString()}</small>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCaLdUMDuWSfg7118-ZFpL1fARkM_BQ2zw",
+        authDomain: "b-one-database.firebaseapp.com",
+        projectId: "b-one-database",
+        storageBucket: "b-one-database.firebasestorage.app",
+        messagingSenderId: "423962812169",
+        appId: "1:423962812169:web:34961a338fe06e693e7dd8",
+        databaseURL: "https://b-one-database-default-rtdb.firebaseio.com/"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // --- LOGIQUE ADMIN NOTIF ---
+    window.AdminNotif = {
+        allNotifs: [],
+        init() {
+            const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+            if (session && session.role === 'admin') {
+                document.getElementById('adminNotifyBtn').classList.remove('d-none');
+                this.listen();
+            }
+        },
+        listen() {
+            onValue(ref(db, 'notifications'), (snapshot) => {
+                const data = snapshot.val();
+                this.allNotifs = data ? Object.entries(data).map(([id, val]) => ({id, ...val})).reverse() : [];
+                const unread = this.allNotifs.filter(n => !n.read).length;
+                const badge = document.getElementById('notifCount');
+                badge.innerText = unread;
+                badge.classList.toggle('d-none', unread === 0);
+                this.render();
+            });
+        },
+        render() {
+            const container = document.getElementById('notifList');
+            const filter = document.getElementById('notifFilter').value.toLowerCase();
+            container.innerHTML = this.allNotifs
+                .filter(n => n.userId.toLowerCase().includes(filter))
+                .map(n => `
+                    <div class="card mb-2 border-0 shadow-sm ${n.read ? 'opacity-75' : 'border-start border-primary border-4'}">
+                        <div class="card-body d-flex justify-content-between align-items-center p-2">
+                            <div>
+                                <small class="fw-bold text-primary">${n.userId}</small>
+                                <p class="mb-0 small">${n.details}</p>
+                            </div>
+                            ${!n.read ? `<button class="btn btn-sm btn-light" onclick="AdminNotif.markRead('${n.id}')">Lu</button>` : ''}
                         </div>
-                    </li>`;
-            });
-        } else {
-            list.innerHTML = '<li class="list-group-item text-center text-muted small">Aucun mouvement enregistré</li>';
-        }
-    });
-
-    // Réinitialiser le compteur (Marquer comme lu)
-    window.resetCounter = function() {
-        onValue(ref(db, 'notifications'), (snapshot) => {
-            const updates = {};
-            snapshot.forEach(child => {
-                updates[`notifications/${child.key}/read`] = true;
-            });
-            update(ref(db), updates);
-        }, { onlyOnce: true });
+                    </div>
+                `).join('');
+        },
+        markRead(id) { update(ref(db, `notifications/${id}`), { read: true }); },
+        clearHistory() {
+            if(prompt("Code Admin :") === "0000") remove(ref(db, 'notifications'));
+        },
+        openModal() { new bootstrap.Modal(document.getElementById('notifModal')).show(); }
     };
 
-    // Supprimer historique par code admin
-    window.clearHistory = function() {
-        const code = prompt("Code admin requis :");
-        if(code === "1234") {
-            remove(ref(db, 'notifications'));
-        } else {
-            alert("Code incorrect");
-        }
-    };
-</script>
-
-<script>
-    // Vérification stricte Admin
-    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
-    if (!session || session.role !== 'admin') {
-        alert("Accès refusé. Seul l'administrateur peut accéder à cette page.");
-        window.location.href = 'login.html';
-    }
-
-    // Logique PWA
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('PWA: Service Worker enregistré !'))
-                .catch(err => console.log('PWA: Erreur d\'enregistrement SW:', err));
-        });
-    }
-
+    // --- LOGIQUE DE DONNÉES SYNCHRONISÉES ---
     const STORAGE_KEY = 'BONE_OFFICIAL_CONFIG_V2';
     const fields = ['companyName', 'regNumber', 'currency', 'mainCountry', 'ceoName', 'ceoWhatsapp', 'ceoEmail'];
     let isLocked = false;
 
-    const UI = {
-        lock() {
-            isLocked = true;
-            document.body.classList.add('locked-mode');
-            fields.forEach(id => {
-                const el = document.getElementById(id);
-                if(el.tagName === 'SELECT') el.disabled = true;
-                else el.readOnly = true;
-            });
-            document.querySelectorAll('.momo-input').forEach(el => el.readOnly = true);
-            document.querySelectorAll('.momo-select').forEach(el => el.disabled = true);
-            document.querySelectorAll('.btn-remove-momo').forEach(el => el.classList.add('hidden-el'));
-            document.getElementById('addMomo').classList.add('hidden-el');
-            document.querySelectorAll('.assoc-input').forEach(el => el.readOnly = true);
-            document.querySelectorAll('.assoc-select').forEach(el => el.disabled = true);
-            document.querySelectorAll('.btn-remove-assoc').forEach(el => el.classList.add('hidden-el'));
-            document.getElementById('addAssociate').classList.add('hidden-el');
-            document.getElementById('uploadZone').classList.add('hidden-el');
-            document.getElementById('finalSignature').style.display = 'block';
-            document.getElementById('signLabel').classList.remove('d-none');
-            const btn = document.getElementById('mainBtn');
-            btn.innerHTML = '<i class="bi bi-unlock-fill me-2"></i>Déverrouiller pour modification';
-            btn.className = 'btn btn-action btn-unlock w-100 shadow';
-        },
-        unlock() {
-            isLocked = false;
-            document.body.classList.remove('locked-mode');
-            fields.forEach(id => {
-                const el = document.getElementById(id);
-                if(el.tagName === 'SELECT') el.disabled = false;
-                else el.readOnly = false;
-            });
-            document.querySelectorAll('.momo-input').forEach(el => el.readOnly = false);
-            document.querySelectorAll('.momo-select').forEach(el => el.disabled = false);
-            document.querySelectorAll('.btn-remove-momo').forEach(el => el.classList.remove('hidden-el'));
-            document.getElementById('addMomo').classList.remove('hidden-el');
-            document.querySelectorAll('.assoc-input').forEach(el => el.readOnly = false);
-            document.querySelectorAll('.assoc-select').forEach(el => el.disabled = false);
-            document.querySelectorAll('.btn-remove-assoc').forEach(el => el.classList.remove('hidden-el'));
-            document.getElementById('addAssociate').classList.remove('hidden-el');
-            document.getElementById('uploadZone').classList.remove('hidden-el');
-            document.getElementById('finalSignature').style.display = 'none';
-            document.getElementById('signLabel').classList.add('d-none');
-            const btn = document.getElementById('mainBtn');
-            btn.innerHTML = '<i class="bi bi-lock-fill me-2"></i>Sauvegarder et verrouiller';
-            btn.className = 'btn btn-action btn-save w-100 shadow';
-        },
-        createMomoRow(network = 'MTN', phone = '') {
-            const container = document.getElementById('momoContainer');
-            const div = document.createElement('div');
-            div.className = 'momo-row';
-            div.innerHTML = `
-                <div class="row g-2 align-items-center">
-                    <div class="col-5">
-                        <select class="form-select form-select-sm momo-select">
-                            <option value="MTN" ${network === 'MTN' ? 'selected' : ''}>MTN (Mobile Money)</option>
-                            <option value="MOOV" ${network === 'MOOV' ? 'selected' : ''}>MOOV (Flooz)</option>
-                            <option value="CELTIIS" ${network === 'CELTIIS' ? 'selected' : ''}>CELTIIS (Celtiis Cash)</option>
-                        </select>
-                    </div>
-                    <div class="col-5">
-                        <input type="tel" class="form-control form-control-sm momo-input" placeholder="Numéro de dépôt" value="${phone}">
-                    </div>
-                    <div class="col-2 text-end">
-                        <button type="button" class="btn btn-link text-danger p-0 btn-remove-momo" onclick="this.closest('.momo-row').remove()">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-            container.appendChild(div);
-        },
-        createAssociateRow(country = 'Bénin', phone = '') {
-            const container = document.getElementById('associatesContainer');
-            const div = document.createElement('div');
-            div.className = 'associate-row';
-            div.innerHTML = `
-                <div class="row g-2 align-items-center">
-                    <div class="col-5">
-                        <select class="form-select form-select-sm assoc-select">
-                            <option value="Bénin" ${country === 'Bénin' ? 'selected' : ''}>Bénin</option>
-                            <option value="Côte d'Ivoire" ${country === "Côte d'Ivoire" ? 'selected' : ''}>Côte d'Ivoire</option>
-                            <option value="Togo" ${country === 'Togo' ? 'selected' : ''}>Togo</option>
-                            <option value="France" ${country === 'France' ? 'selected' : ''}>France</option>
-                        </select>
-                    </div>
-                    <div class="col-5">
-                        <input type="tel" class="form-control form-control-sm assoc-input" placeholder="Numéro WhatsApp" value="${phone}">
-                    </div>
-                    <div class="col-2 text-end">
-                        <button type="button" class="btn btn-link text-danger p-0 btn-remove-assoc" onclick="this.closest('.associate-row').remove()">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-            container.appendChild(div);
-        }
-    };
-
-    const Data = {
+    window.Data = {
         save() {
             const config = {};
             fields.forEach(id => config[id] = document.getElementById(id).value);
+            
             config.momoAccounts = [];
             document.querySelectorAll('.momo-row').forEach(row => {
                 config.momoAccounts.push({
@@ -401,6 +315,7 @@
                     phone: row.querySelector('.momo-input').value
                 });
             });
+
             config.associates = [];
             document.querySelectorAll('.associate-row').forEach(row => {
                 config.associates.push({
@@ -408,9 +323,14 @@
                     phone: row.querySelector('.assoc-input').value
                 });
             });
+
             config.logo = document.getElementById('logoPrev').src;
             config.sign = document.getElementById('signPrev').src;
+
+            // SAUVEGARDE LOCALE + FIREBASE
             localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+            set(ref(db, 'config'), config); 
+            
             this.applyLogos(config.logo, config.sign);
             if(config.companyName) document.getElementById('navCompanyName').innerText = config.companyName;
         },
@@ -429,67 +349,123 @@
             }
         },
         load() {
-            const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
-            if(!data) {
-                document.getElementById('companyName').value = "MT & B-One";
-                document.getElementById('navCompanyName').innerText = "MT & B-One";
-                return;
-            }
-            fields.forEach(id => { if(data[id]) document.getElementById(id).value = data[id]; });
-            if(data.momoAccounts) {
-                document.getElementById('momoContainer').innerHTML = '';
-                data.momoAccounts.forEach(acc => UI.createMomoRow(acc.network, acc.phone));
-            }
-            if(data.associates) {
-                document.getElementById('associatesContainer').innerHTML = '';
-                data.associates.forEach(assoc => UI.createAssociateRow(assoc.country, assoc.phone));
-            }
-            if(data.companyName) document.getElementById('navCompanyName').innerText = data.companyName;
-            this.applyLogos(data.logo, data.sign);
-            UI.lock();
+            // Écoute Firebase en priorité pour la synchro multi-appareil
+            onValue(ref(db, 'config'), (snapshot) => {
+                const data = snapshot.val() || JSON.parse(localStorage.getItem(STORAGE_KEY));
+                if(!data) {
+                    document.getElementById('companyName').value = "MT & B-One";
+                    return;
+                }
+                fields.forEach(id => { if(data[id]) document.getElementById(id).value = data[id]; });
+                
+                if(data.momoAccounts) {
+                    document.getElementById('momoContainer').innerHTML = '';
+                    data.momoAccounts.forEach(acc => UI.createMomoRow(acc.network, acc.phone));
+                }
+                if(data.associates) {
+                    document.getElementById('associatesContainer').innerHTML = '';
+                    data.associates.forEach(assoc => UI.createAssociateRow(assoc.country, assoc.phone));
+                }
+
+                if(data.companyName) document.getElementById('navCompanyName').innerText = data.companyName;
+                this.applyLogos(data.logo, data.sign);
+                UI.lock();
+            });
         }
     };
 
-    document.getElementById('addMomo').addEventListener('click', () => UI.createMomoRow());
-    document.getElementById('addAssociate').addEventListener('click', () => UI.createAssociateRow());
+    // Initialisation
+    window.onload = () => {
+        Data.load();
+        AdminNotif.init();
+    };
 
-    document.getElementById('robustForm').addEventListener('submit', (e) => {
+    // Liaison du formulaire au module
+    document.getElementById('robustForm').onsubmit = (e) => {
         e.preventDefault();
         if(!isLocked) {
-            if(confirm("Confirmez-vous la sauvegarde et le verrouillage des données ?")) {
+            if(confirm("Confirmez-vous la sauvegarde et le verrouillage ?")) {
                 Data.save();
                 UI.lock();
             }
         } else {
-            if(confirm("Voulez-vous vraiment déverrouiller le système pour modification ?")) {
-                UI.unlock();
-            }
+            if(confirm("Déverrouiller pour modification ?")) UI.unlock();
         }
-        if(navigator.vibrate) navigator.vibrate(100);
-    });
+    };
+</script>
+
+<script>
+    // UI LOGIC (Structure conservée)
+    const UI = {
+        lock() {
+            isLocked = true;
+            document.body.classList.add('locked-mode');
+            ['companyName', 'regNumber', 'currency', 'mainCountry', 'ceoName', 'ceoWhatsapp', 'ceoEmail'].forEach(id => {
+                const el = document.getElementById(id);
+                if(el.tagName === 'SELECT') el.disabled = true;
+                else el.readOnly = true;
+            });
+            document.querySelectorAll('.momo-input, .assoc-input').forEach(el => el.readOnly = true);
+            document.querySelectorAll('.momo-select, .assoc-select').forEach(el => el.disabled = true);
+            document.querySelectorAll('.btn-remove-momo, .btn-remove-assoc, #addMomo, #addAssociate, #uploadZone').forEach(el => el.classList.add('hidden-el'));
+            document.getElementById('finalSignature').style.display = 'block';
+            document.getElementById('signLabel').classList.remove('d-none');
+            const btn = document.getElementById('mainBtn');
+            btn.innerHTML = '<i class="bi bi-unlock-fill me-2"></i>Déverrouiller pour modification';
+            btn.className = 'btn btn-action btn-unlock w-100 shadow';
+        },
+        unlock() {
+            isLocked = false;
+            document.body.classList.remove('locked-mode');
+            ['companyName', 'regNumber', 'currency', 'mainCountry', 'ceoName', 'ceoWhatsapp', 'ceoEmail'].forEach(id => {
+                const el = document.getElementById(id);
+                if(el.tagName === 'SELECT') el.disabled = false;
+                else el.readOnly = false;
+            });
+            document.querySelectorAll('.momo-input, .assoc-input').forEach(el => el.readOnly = false);
+            document.querySelectorAll('.momo-select, .assoc-select').forEach(el => el.disabled = false);
+            document.querySelectorAll('.btn-remove-momo, .btn-remove-assoc, #addMomo, #addAssociate, #uploadZone').forEach(el => el.classList.remove('hidden-el'));
+            document.getElementById('finalSignature').style.display = 'none';
+            document.getElementById('signLabel').classList.add('d-none');
+            const btn = document.getElementById('mainBtn');
+            btn.innerHTML = '<i class="bi bi-lock-fill me-2"></i>Sauvegarder et verrouiller';
+            btn.className = 'btn btn-action btn-save w-100 shadow';
+        },
+        createMomoRow(network = 'MTN', phone = '') {
+            const container = document.getElementById('momoContainer');
+            const div = document.createElement('div');
+            div.className = 'momo-row';
+            div.innerHTML = `<div class="row g-2 align-items-center"><div class="col-5"><select class="form-select form-select-sm momo-select"><option value="MTN" ${network === 'MTN'?'selected':''}>MTN</option><option value="MOOV" ${network === 'MOOV'?'selected':''}>MOOV</option><option value="CELTIIS" ${network === 'CELTIIS'?'selected':''}>CELTIIS</option></select></div><div class="col-5"><input type="tel" class="form-control form-control-sm momo-input" value="${phone}"></div><div class="col-2 text-end"><button type="button" class="btn btn-link text-danger p-0 btn-remove-momo" onclick="this.closest('.momo-row').remove()"><i class="bi bi-trash"></i></button></div></div>`;
+            container.appendChild(div);
+        },
+        createAssociateRow(country = 'Bénin', phone = '') {
+            const container = document.getElementById('associatesContainer');
+            const div = document.createElement('div');
+            div.className = 'associate-row';
+            div.innerHTML = `<div class="row g-2 align-items-center"><div class="col-5"><select class="form-select form-select-sm assoc-select"><option value="Bénin" ${country === 'Bénin'?'selected':''}>Bénin</option><option value="Côte d'Ivoire" ${country === "Côte d'Ivoire"?'selected':''}>Côte d'Ivoire</option></select></div><div class="col-5"><input type="tel" class="form-control form-control-sm assoc-input" value="${phone}"></div><div class="col-2 text-end"><button type="button" class="btn btn-link text-danger p-0 btn-remove-assoc" onclick="this.closest('.associate-row').remove()"><i class="bi bi-trash"></i></button></div></div>`;
+            container.appendChild(div);
+        }
+    };
+
+    document.getElementById('addMomo').onclick = () => UI.createMomoRow();
+    document.getElementById('addAssociate').onclick = () => UI.createAssociateRow();
 
     function setupImage(inpId, prevId, placeId) {
         document.getElementById(inpId).onchange = (e) => {
-            if(!e.target.files[0]) return;
             const reader = new FileReader();
             reader.readAsDataURL(e.target.files[0]);
             reader.onload = (ev) => {
-                const imgBase64 = ev.target.result;
-                document.getElementById(prevId).src = imgBase64;
+                document.getElementById(prevId).src = ev.target.result;
                 document.getElementById(prevId).style.display = 'block';
                 document.getElementById(placeId).classList.add('hidden-el');
-                if(inpId === 'logoInp') document.getElementById('navLogo').src = imgBase64;
-                if(inpId === 'signInp') document.getElementById('finalSignature').src = imgBase64;
             };
         };
     }
     setupImage('logoInp', 'logoPrev', 'logoPlaceholder');
     setupImage('signInp', 'signPrev', 'signPlaceholder');
 
-    window.onload = () => Data.load();
-
     function logout() {
-        if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
+        if (confirm("Atizoun, déconnexion ?")) {
             localStorage.removeItem('BONE_USER_SESSION');
             window.location.href = 'login.html';
         }
@@ -497,11 +473,5 @@
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="google-sheets-sync.js"></script>
-
-<button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
-    <i class="bi bi-power fs-4"></i>
-</button>
-
 </body>
 </html>

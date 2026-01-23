@@ -134,6 +134,40 @@
 </head>
 <body>
 
+<div id="adminNotifyBtn" class="position-fixed bottom-0 start-0 m-3 d-none" style="z-index: 2001;">
+    <button class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center" 
+            style="width: 60px; height: 60px; background: linear-gradient(135deg, #7d2ae8 0%, #00c4cc 100%); border: 2px solid white;"
+            onclick="AdminNotif.openModal()">
+        <i class="bi bi-bell-fill fs-4"></i>
+        <span id="notifCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+    </button>
+</div>
+
+<div class="modal fade" id="notifModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+            <div class="modal-header border-0 text-white" style="background: var(--canva-gradient); border-radius: 20px 20px 0 0;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-lightning-charge-fill me-2"></i>Mouvements Récents</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="input-group mb-3">
+                    <span class="input-group-text bg-white border-end-0 rounded-start-pill"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" id="notifFilter" class="form-control border-start-0 rounded-end-pill" placeholder="Filtrer par utilisateur..." oninput="AdminNotif.render()">
+                </div>
+                <div id="notifList" style="max-height: 400px; overflow-y: auto;">
+                    </div>
+            </div>
+            <div class="modal-footer border-0 d-flex justify-content-between">
+                <button class="btn btn-outline-danger btn-sm rounded-pill" onclick="AdminNotif.clearHistory()">
+                    <i class="bi bi-trash3 me-1"></i>Réinitialiser (Code Admin)
+                </button>
+                <button class="btn btn-secondary btn-sm rounded-pill" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="successOverlay" class="success-overlay">
     <svg class="success-checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
       <circle class="success-checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
@@ -478,37 +512,114 @@
 </div>
 
 <script type="module">
-    // --- IMPORTATION FIREBASE ---
-    import { db, ref, set, onValue, remove, sendNotification } from './firebase-config.js';
+    import { db, ref, onValue, push, set, update, remove } from './firebase-config.js';
 
+    // Rendre Firebase accessible globalement pour les fonctions legacy de Shop
+    window.firebaseDB = { db, ref, push, set, update, remove };
+
+    // --- SYNCHRONISATION TEMPS RÉEL ---
+    function syncFirebaseData() {
+        // Produits
+        onValue(ref(db, 'products'), (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                const productList = Object.values(data);
+                localStorage.setItem('BONE_PRODUCTS_LIST', JSON.stringify(productList));
+                if (window.Shop) window.Shop.render();
+            }
+        });
+
+        // Commandes (pour l'admin)
+        onValue(ref(db, 'orders'), (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                localStorage.setItem('BONE_ORDERS_HISTORY', JSON.stringify(Object.values(data)));
+                if (window.Shop && window.Shop.isAdmin) window.Shop.renderOrdersTable();
+            }
+        });
+    }
+
+    // --- GESTION DES NOTIFICATIONS ---
+    window.AdminNotif = {
+        allNotifs: [],
+        init() {
+            const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+            if (session && session.role === 'admin') {
+                document.getElementById('adminNotifyBtn').classList.remove('d-none');
+                this.listen();
+            }
+        },
+        listen() {
+            onValue(ref(db, 'notifications'), (snapshot) => {
+                const data = snapshot.val();
+                this.allNotifs = data ? Object.entries(data).map(([id, val]) => ({id, ...val})).reverse() : [];
+                const unread = this.allNotifs.filter(n => !n.read).length;
+                const badge = document.getElementById('notifCount');
+                badge.innerText = unread;
+                badge.classList.toggle('d-none', unread === 0);
+                this.render();
+            });
+        },
+        render() {
+            const container = document.getElementById('notifList');
+            const filter = document.getElementById('notifFilter').value.toLowerCase();
+            container.innerHTML = this.allNotifs
+                .filter(n => n.userId.toLowerCase().includes(filter))
+                .map(n => `
+                    <div class="card mb-2 border-0 shadow-sm ${n.read ? 'bg-light' : 'border-start border-primary border-4'}">
+                        <div class="card-body p-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="fw-bold d-block">${n.details}</small>
+                                    <small class="text-muted">Par: ${n.userId} | ${new Date(n.timestamp).toLocaleTimeString()}</small>
+                                </div>
+                                ${!n.read ? `<button class="btn btn-sm btn-primary rounded-pill py-0" onclick="AdminNotif.markRead('${n.id}')">Lu</button>` : '<i class="bi bi-check2 text-success"></i>'}
+                            </div>
+                        </div>
+                    </div>
+                `).join('') || '<p class="text-center py-3">Aucun mouvement.</p>';
+        },
+        markRead(id) { update(ref(db, `notifications/${id}`), { read: true }); },
+        clearHistory() {
+            if (prompt("Code Admin ?") === "0000") remove(ref(db, 'notifications'));
+        },
+        openModal() { new bootstrap.Modal(document.getElementById('notifModal')).show(); }
+    };
+
+    window.addEventListener('load', () => {
+        syncFirebaseData();
+        AdminNotif.init();
+    });
+</script>
+
+<script>
+    // --- Initialisation de la session et restrictions ---
     const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
     if (!session) window.location.href = 'login.html';
 
     function appliquerRestrictions() {
-        const sessionActualisee = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
-        if (sessionActualisee && sessionActualisee.role === 'user') {
+        if (session.role === 'user') {
             const addBtn = document.querySelector('[data-bs-target="#addProductModal"], #addProductBtn, #btnFloatAdd');
             if (addBtn) addBtn.style.display = 'none';
-
             const actionButtons = document.querySelectorAll('.bi-pencil, .bi-pencil-square, .bi-trash, .bi-trash3, .btn-outline-danger, .btn-outline-primary, .btn-edit-prod');
             actionButtons.forEach(btn => {
                 if (!btn.classList.contains('bi-cart-plus')) {
                     btn.parentElement.style.display = 'none'; 
                 }
             });
-
             const adminLinks = document.querySelectorAll('a[href="comptabilite.html"], a[href="configuration.html"], a[href="maintenance.html"]');
             adminLinks.forEach(link => link.style.display = 'none');
         }
     }
 
     const STORAGE_KEY = 'BONE_OFFICIAL_CONFIG_V2';
+    const DB_KEY = 'BONE_PRODUCTS_LIST';
     const CAT_KEY = 'BONE_CATEGORIES_LIST';
     const ORIGIN_KEY = 'BONE_ORIGINS_LIST';
     const SESSION_KEY = 'BONE_USER_SESSION';
     const ORDERS_KEY = 'BONE_ORDERS_HISTORY';
 
-    let products = [];
+    let products = JSON.parse(localStorage.getItem(DB_KEY)) || [];
     let categories = JSON.parse(localStorage.getItem(CAT_KEY)) || ['Énergie', 'Audio', 'Mobilité'];
     let origins = JSON.parse(localStorage.getItem(ORIGIN_KEY)) || ['Chine', 'Dubaï', 'USA', 'Europe'];
     let orders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
@@ -522,19 +633,9 @@
             this.checkSession();
             this.renderCategories();
             this.renderOrigins();
+            this.render();
             this.loadBrandConfig();
-            
-            // ÉCOUTE FIREBASE EN TEMPS RÉEL (Correctif chargement instantané)
-            onValue(ref(db, 'produits'), (snapshot) => {
-                const data = snapshot.val();
-                products = data ? Object.values(data) : [];
-                this.render();
-                if(this.isAdmin) {
-                    this.renderAdminTable();
-                    this.renderOrdersTable();
-                }
-                appliquerRestrictions();
-            });
+            appliquerRestrictions();
         },
 
         checkSession() {
@@ -554,6 +655,11 @@
                 document.querySelector('.nav-home')?.style.setProperty('display', 'none', 'important');
                 document.querySelector('.nav-cart')?.style.setProperty('display', 'none', 'important');
                 document.querySelector('.nav-pay')?.style.setProperty('display', 'none', 'important');
+            }
+
+            if(this.isAdmin) {
+                this.renderAdminTable();
+                this.renderOrdersTable();
             }
         },
 
@@ -582,14 +688,13 @@
         renderCategories() {
             const tabs = document.getElementById('categoryTabs');
             const select = document.getElementById('pCat');
-            
             tabs.innerHTML = `<div class="cat-badge active" onclick="Shop.filter('Tous', this)">Tous</div>` + 
                 categories.map(c => `
                     <div class="cat-badge" onclick="Shop.filter('${c}', this)">
                         ${c}
                         ${this.isAdmin ? `<i class="bi bi-x-circle btn-del-cat" onclick="event.stopPropagation(); Shop.deleteCategory('${c}')"></i>` : ''}
                     </div>`).join('');
-            if(select) select.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+            select.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
         },
 
         addNewCategory() {
@@ -607,7 +712,7 @@
 
         renderOrigins() {
             const select = document.getElementById('pOrigin');
-            if(select) select.innerHTML = origins.map(o => `<option value="${o}">${o}</option>`).join('');
+            select.innerHTML = origins.map(o => `<option value="${o}">${o}</option>`).join('');
         },
 
         addNewOrigin() {
@@ -628,7 +733,6 @@
 
         render(items = products) {
             const grid = document.getElementById('productGrid');
-            if(!grid) return;
             grid.innerHTML = items.map(p => {
                 let displayPrice = "N/D";
                 if(p.canaux) {
@@ -659,6 +763,7 @@
                     </div>
                 </div>`;
             }).join('');
+            appliquerRestrictions();
         },
 
         openOrderModal(id) {
@@ -745,9 +850,7 @@
                 if(!cb.checked) {
                     cb.checked = true;
                     let val = 0;
-                    if(cb.previousElementSibling) {
-                        val = parseInt(cb.previousElementSibling.value || cb.previousElementSibling.innerText) || 0;
-                    }
+                    if(cb.previousElementSibling) { val = parseInt(cb.previousElementSibling.value || cb.previousElementSibling.innerText) || 0; }
                     if (val > 0) this.selectedPrices.push(val);
                 }
             });
@@ -759,14 +862,8 @@
         },
 
         togglePriceSelection(price, checkbox) {
-            if(checkbox.checked) {
-                this.selectedPrices.push(price);
-            } else {
-                const index = this.selectedPrices.indexOf(price);
-                if(index > -1) {
-                    this.selectedPrices.splice(index, 1);
-                }
-            }
+            if(checkbox.checked) { this.selectedPrices.push(price); } 
+            else { const index = this.selectedPrices.indexOf(price); if(index > -1) { this.selectedPrices.splice(index, 1); } }
             const totalSelected = this.selectedPrices.reduce((sum, val) => sum + val, 0);
             const qty = parseInt(document.getElementById('orderQty').value) || 1;
             document.getElementById('orderCustomPrice').value = totalSelected;
@@ -786,93 +883,49 @@
                 banner.style.display = "block";
                 const hasStock = (this.currentOrderProduct.stock >= qty);
                 const paymentOk = (payed >= total && total > 0);
-                
                 if(paymentOk) {
-                    if(hasStock) {
-                        banner.className = "order-status-banner bg-success-subtle text-success border border-success";
-                        banner.innerHTML = `<i class="bi bi-check-circle-fill"></i> COMMANDE PRÊTE (STOCK DISPO)`;
-                    } else {
-                        banner.className = "order-status-banner bg-info-subtle text-primary border border-primary";
-                        banner.innerHTML = `<i class="bi bi-clock-history"></i> PROJET ENREGISTRÉ (VAGUE ${this.currentOrderProduct.currentWave || 1})`;
-                    }
-                } else {
-                    banner.className = "order-status-banner bg-danger-subtle text-danger border border-danger";
-                    banner.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i> PAIEMENT INSUFFISANT`;
-                }
-            } else {
-                banner.style.display = "none";
-            }
+                    if(hasStock) { banner.className = "order-status-banner bg-success-subtle text-success border border-success"; banner.innerHTML = `<i class="bi bi-check-circle-fill"></i> COMMANDE PRÊTE (STOCK DISPO)`; } 
+                    else { banner.className = "order-status-banner bg-info-subtle text-primary border border-primary"; banner.innerHTML = `<i class="bi bi-clock-history"></i> PROJET ENREGISTRÉ (VAGUE ${this.currentOrderProduct.currentWave || 1})`; }
+                } else { banner.className = "order-status-banner bg-danger-subtle text-danger border border-danger"; banner.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i> PAIEMENT INSUFFISANT`; }
+            } else { banner.style.display = "none"; }
         },
 
         validateProject() {
             const clientName = document.getElementById('orderClientName').value.trim();
             const clientPhone = document.getElementById('orderClientPhone').value.trim();
             const qty = parseInt(document.getElementById('orderQty').value) || 0;
+            if(!clientName || !clientPhone || qty <= 0) { alert("Erreur : Veuillez remplir tous les champs."); return; }
 
-            if(!clientName || !clientPhone || qty <= 0) {
-                alert("Erreur : Veuillez remplir tous les champs obligatoires.");
-                return;
-            }
-
-            const currentProduct = this.currentOrderProduct;
-            const wave = currentProduct.currentWave || 1;
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('fr-FR');
-            const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-
-            const newOrder = {
-                id: "CMD-" + Date.now(),
-                timestamp: Date.now(),
-                prodId: currentProduct.id,
-                prodName: currentProduct.name,
-                wave: wave,
-                quantity: qty,
-                minOrderRequired: parseInt(currentProduct.minQty) || 1,
-                ref: currentProduct.uniqueId,
-                client: clientName,
-                phone: clientPhone,
-                price: parseInt(document.getElementById('orderCustomPrice').value) || 0,
-                qty: qty,
+            const p = this.currentOrderProduct;
+            const orderId = "CMD-" + Date.now();
+            const orderData = {
+                id: orderId, timestamp: Date.now(), prodId: p.id, prodName: p.name, wave: p.currentWave || 1,
+                qty: qty, client: clientName, phone: clientPhone,
                 total: (parseInt(document.getElementById('orderCustomPrice').value) || 0) * qty,
-                status: (currentProduct.stock >= qty) ? "Validée" : "À Lancer",
-                date: `${dateStr} à ${timeStr}`
+                status: (p.stock >= qty) ? "Validée" : "À Lancer",
+                date: new Date().toLocaleString('fr-FR')
             };
 
-            orders.push(newOrder);
-            localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+            // SYNC FIREBASE
+            if (window.firebaseDB) {
+                window.firebaseDB.set(window.firebaseDB.ref(window.firebaseDB.db, 'orders/' + orderId), orderData);
+                window.firebaseDB.push(window.firebaseDB.ref(window.firebaseDB.db, 'notifications'), {
+                    userId: clientName, details: `Projet validé : ${p.name} (x${qty})`, timestamp: Date.now(), read: false
+                });
+            }
 
-            if(newOrder.status === "Validée") {
-                const idx = products.findIndex(x => x.id === currentProduct.id);
-                if(idx !== -1) {
-                    products[idx].stock -= newOrder.qty;
-                    set(ref(db, 'produits/' + products[idx].id), products[idx]);
+            // Update Stock Local if validated
+            if(orderData.status === "Validée") {
+                const idx = products.findIndex(x => x.id === p.id);
+                if(idx !== -1) { 
+                    products[idx].stock -= qty; 
+                    if (window.firebaseDB) window.firebaseDB.update(window.firebaseDB.ref(window.firebaseDB.db, 'products/' + p.id), { stock: products[idx].stock });
                 }
             }
 
-            this.checkWaveThreshold(currentProduct.id);
             bootstrap.Modal.getInstance(document.getElementById('orderModal')).hide();
-            const overlay = document.getElementById('successOverlay');
-            overlay.style.display = 'flex';
+            document.getElementById('successOverlay').style.display = 'flex';
             setTimeout(() => { window.location.href = "panier.html"; }, 2000);
-        },
-
-        checkWaveThreshold(productId) {
-            const productIdx = products.findIndex(p => p.id === productId);
-            if (productIdx === -1) return;
-            const p = products[productIdx];
-            const currentWave = p.currentWave || 1;
-            const minQty = parseInt(p.minQty) || 1;
-
-            if (minQty > 1) {
-                const totalInWave = orders
-                    .filter(o => o.prodId === productId && o.wave === currentWave)
-                    .reduce((sum, o) => sum + (parseInt(o.qty) || 0), 0);
-
-                if (totalInWave >= minQty) {
-                    products[productIdx].currentWave = currentWave + 1;
-                    set(ref(db, 'produits/' + productId), products[productIdx]);
-                }
-            }
         },
 
         openAddModal() {
@@ -916,50 +969,46 @@
             if(e) { e.preventDefault(); e.stopPropagation(); }
             const btnSave = document.getElementById('btnSaveMain');
             btnSave.disabled = true;
-            btnSave.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Traitement...';
+            btnSave.innerHTML = '<span class="spinner-border spinner-border-sm"></span>...';
 
-            try {
-                const editId = document.getElementById('editProductId').value;
-                const pOld = editId ? products.find(x => x.id == editId) : null;
+            const editId = document.getElementById('editProductId').value;
+            const pId = editId ? parseInt(editId) : Date.now();
+            const pOld = editId ? products.find(x => x.id == editId) : null;
 
-                const pData = {
-                    id: editId ? parseInt(editId) : Date.now(),
-                    uniqueId: editId ? pOld.uniqueId : "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase(),
-                    currentWave: editId ? (pOld.currentWave || 1) : 1,
-                    name: document.getElementById('pName').value,
-                    priceBuy: parseFloat(document.getElementById('pPriceBuy').value) || 0,
-                    cat: document.getElementById('pCat').value,
-                    qualities: document.getElementById('pQualities').value,
-                    stock: parseInt(document.getElementById('pStock').value) || 0,
-                    minQty: parseInt(document.getElementById('pMinQty').value) || 1,
-                    currency: document.getElementById('pCurrency').value,
-                    origin: document.getElementById('pOrigin').value,
-                    img: document.getElementById('pImgBase64').value || "https://via.placeholder.com/150",
-                    canaux: {
-                        avion: { vente: parseInt(document.getElementById('pAvionVente').value) || 0, transit: parseInt(document.getElementById('pAvionTransit').value) || 0, douane: parseInt(document.getElementById('pAvionDouane').value) || 0, liv: parseInt(document.getElementById('pAvionLiv').value) || 0 },
-                        bateau: { vente: parseInt(document.getElementById('pBateauVente').value) || 0, transit: parseInt(document.getElementById('pBateauTransit').value) || 0, douane: parseInt(document.getElementById('pBateauDouane').value) || 0, liv: parseInt(document.getElementById('pBateauLiv').value) || 0 },
-                        direct: { ttc: parseInt(document.getElementById('pDirectTTC').value) || 0, grosTTC: parseInt(document.getElementById('pGrosTTC').value) || 0, grosQty: parseInt(document.getElementById('pGrosQty').value) || 0 }
-                    }
-                };
-                
-                const prodRef = ref(db, 'produits/' + pData.id);
-                set(prodRef, pData).then(() => {
-                    sendNotification('Mouvement Produit', `${pData.name} - Enregistré`);
-                    bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
+            const pData = {
+                id: pId,
+                uniqueId: editId ? pOld.uniqueId : "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase(),
+                currentWave: editId ? (pOld.currentWave || 1) : 1,
+                name: document.getElementById('pName').value,
+                priceBuy: parseFloat(document.getElementById('pPriceBuy').value) || 0,
+                cat: document.getElementById('pCat').value,
+                qualities: document.getElementById('pQualities').value,
+                stock: parseInt(document.getElementById('pStock').value) || 0,
+                minQty: parseInt(document.getElementById('pMinQty').value) || 1,
+                currency: document.getElementById('pCurrency').value,
+                origin: document.getElementById('pOrigin').value,
+                img: document.getElementById('pImgBase64').value || "https://via.placeholder.com/150",
+                canaux: {
+                    avion: { vente: parseInt(document.getElementById('pAvionVente').value) || 0, transit: parseInt(document.getElementById('pAvionTransit').value) || 0, douane: parseInt(document.getElementById('pAvionDouane').value) || 0, liv: parseInt(document.getElementById('pAvionLiv').value) || 0 },
+                    bateau: { vente: parseInt(document.getElementById('pBateauVente').value) || 0, transit: parseInt(document.getElementById('pBateauTransit').value) || 0, douane: parseInt(document.getElementById('pBateauDouane').value) || 0, liv: parseInt(document.getElementById('pBateauLiv').value) || 0 },
+                    direct: { ttc: parseInt(document.getElementById('pDirectTTC').value) || 0, grosTTC: parseInt(document.getElementById('pGrosTTC').value) || 0, grosQty: parseInt(document.getElementById('pGrosQty').value) || 0 }
+                }
+            };
+
+            if (window.firebaseDB) {
+                window.firebaseDB.set(window.firebaseDB.ref(window.firebaseDB.db, 'products/' + pId), pData);
+                window.firebaseDB.push(window.firebaseDB.ref(window.firebaseDB.db, 'notifications'), {
+                    userId: session.name || "Admin", details: `Produit ${editId ? 'modifié' : 'ajouté'} : ${pData.name}`, timestamp: Date.now(), read: false
                 });
-
-            } catch (err) {
-                alert("Une erreur est survenue lors de l'enregistrement.");
-            } finally {
-                btnSave.disabled = false;
-                btnSave.innerHTML = 'ENREGISTRER';
             }
+
+            bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
+            btnSave.disabled = false; btnSave.innerHTML = 'ENREGISTRER';
         },
 
         showDetails(id) {
             const p = products.find(x => x.id === id);
             if(!p) return;
-            const wave = p.currentWave || 1;
             document.getElementById('currentProductId').value = p.id;
             document.getElementById('modalImg').src = p.img;
             document.getElementById('modalTitle').innerText = p.name;
@@ -968,15 +1017,12 @@
             document.getElementById('modalOrigin').innerText = "Origine : " + (p.origin || 'N/C');
             
             const waveBadge = document.getElementById('modalWaveNumber');
-            if(p.minQty > 1) { waveBadge.innerText = "VAGUE N°" + wave; waveBadge.style.display = "inline-block"; }
+            if(p.minQty > 1) { waveBadge.innerText = "VAGUE N°" + (p.currentWave || 1); waveBadge.style.display = "inline-block"; }
             else { waveBadge.style.display = "none"; }
 
-            const totalInWave = orders.filter(o => o.prodId === p.id && o.wave === wave).reduce((sum, o) => sum + (parseInt(o.qty) || 0), 0);
-            const minT = parseInt(p.minQty) || 1;
-
             const stockDiv = document.getElementById('modalStockDisplay');
-            if(p.stock && p.stock > 0) { stockDiv.innerHTML = `<span class="stock-badge bg-success text-white">📦 STOCK DISPONIBLE : ${p.stock}</span>`; }
-            else { stockDiv.innerHTML = `<span class="stock-badge bg-warning text-dark">⏳ SUR COMMANDE (${totalInWave}/${minT})</span>`; }
+            if(p.stock && p.stock > 0) { stockDiv.innerHTML = `<span class="stock-badge bg-success text-white">📦 STOCK : ${p.stock}</span>`; }
+            else { stockDiv.innerHTML = `<span class="stock-badge bg-warning text-dark">⏳ SUR COMMANDE</span>`; }
 
             let htmlPrices = "";
             const curr = p.currency || 'F CFA';
@@ -984,66 +1030,44 @@
                 const c = p.canaux;
                 if(c.avion?.vente) {
                     const tot = (parseInt(c.avion.vente)||0) + (parseInt(c.avion.transit)||0) + (parseInt(c.avion.douane)||0) + (parseInt(c.avion.liv)||0);
-                    htmlPrices += `<div class="mb-2 p-2 border rounded"><div class="d-flex justify-content-between fw-bold text-primary"><span>✈️ AVION</span><span>${tot.toLocaleString()} ${curr}</span></div><div class="price-detail-box">Base: ${c.avion.vente} | Transit: ${c.avion.transit} | Douane: ${c.avion.douane} | Liv: ${c.avion.liv}</div></div>`;
+                    htmlPrices += `<div class="mb-2 p-2 border rounded"><div class="d-flex justify-content-between fw-bold text-primary"><span>✈️ AVION</span><span>${tot.toLocaleString()} ${curr}</span></div></div>`;
                 }
                 if(c.bateau?.vente) {
                     const tot = (parseInt(c.bateau.vente)||0) + (parseInt(c.bateau.transit)||0) + (parseInt(c.bateau.douane)||0) + (parseInt(c.bateau.liv)||0);
-                    htmlPrices += `<div class="mb-2 p-2 border rounded"><div class="d-flex justify-content-between fw-bold text-info"><span>🚢 BATEAU</span><span>${tot.toLocaleString()} ${curr}</span></div><div class="price-detail-box">Base: ${c.bateau.vente} | Transit: ${c.bateau.transit} | Douane: ${c.bateau.douane} | Liv: ${c.bateau.liv}</div></div>`;
+                    htmlPrices += `<div class="mb-2 p-2 border rounded"><div class="d-flex justify-content-between fw-bold text-info"><span>🚢 BATEAU</span><span>${tot.toLocaleString()} ${curr}</span></div></div>`;
                 }
-                if(c.direct?.ttc) { htmlPrices += `<div class="mb-2 p-2 border rounded bg-light"><div class="d-flex justify-content-between fw-bold text-success"><span>🏠 AU MAGASIN (Direct)</span><span>${c.direct.ttc.toLocaleString()} ${curr}</span></div></div>`; }
+                if(c.direct?.ttc) { htmlPrices += `<div class="mb-2 p-2 border rounded bg-light"><div class="d-flex justify-content-between fw-bold text-success"><span>🏠 MAGASIN</span><span>${c.direct.ttc.toLocaleString()} ${curr}</span></div></div>`; }
             }
             document.getElementById('modalPriceList').innerHTML = htmlPrices || "<p class='text-muted'>Aucun prix configuré</p>";
-            this.loadBrandConfig();
             new bootstrap.Modal(document.getElementById('productModal')).show();
+            appliquerRestrictions();
         },
 
         getPublishText() {
             const config = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
             const p = products.find(x => x.id == document.getElementById('currentProductId').value);
-            const wave = p.currentWave || 1;
-            const totalInWave = orders.filter(o => o.prodId === p.id && o.wave === wave).reduce((sum, o) => sum + (parseInt(o.qty) || 0), 0);
-            const minT = parseInt(p.minQty) || 1;
-            
-            // Correction progression commandes
-            const progressionStr = minT > 1 ? `(${totalInWave}/${minT} - V${wave})` : "";
-            const stockTxt = (p && p.stock > 0) ? `✅ Stock : ${p.stock}` : `⏳ Sur commande ${progressionStr}`;
-            
-            const phoneForLink = (config.ceoWhatsapp || "").replace(/\s+/g, '').replace('+', '');
             const curr = p.currency || 'F CFA';
-            let priceTxt = "";
-            if(p.canaux) {
-                if(p.canaux.avion?.vente) { const c = p.canaux.avion; const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0); priceTxt += `✈️ *AVION :* ${tot.toLocaleString()} ${curr}\n`; }
-                if(p.canaux.bateau?.vente) { const c = p.canaux.bateau; const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0); priceTxt += `🚢 *BATEAU :* ${tot.toLocaleString()} ${curr}\n`; }
-                if(p.canaux.direct?.ttc) { priceTxt += `🏠 *MAGASIN :* ${p.canaux.direct.ttc.toLocaleString()} ${curr}\n`; }
-            }
-            return `🌟 *DISPONIBILITÉ : ${config.companyName || "MT & B-One"}*\n━━━━━━━━━━━━━━━━━━\n\n📦 *Produit :* ${p.name}\n🔍 *Réf :* ${p.uniqueId}\n📊 *État :* ${stockTxt}\n✨ *Qualités :* ${p.qualities || 'Qualité Premium'}\n\n💰 *TARIFS :*\n${priceTxt}\n📲 *Contact PDG :* https://wa.me/${phoneForLink}\n✍️ _Signé : ${config.ceoName || "L'Administrateur"}_`;
+            return `🌟 *${config.companyName || "MT & B-One"}*\n📦 *Produit :* ${p.name}\n🔍 *Réf :* ${p.uniqueId}\n✨ *Qualités :* ${p.qualities || 'Premium'}\n📲 *WhatsApp :* ${config.ceoWhatsapp || ""}`;
         },
 
         publishToStatus() { window.open(`https://wa.me/?text=${encodeURIComponent(this.getPublishText())}`, '_blank'); },
 
         shareProductImg() {
-            const area = document.getElementById('captureArea');
-            html2canvas(area, { useCORS: true, scale: 2 }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = `Fiche_Produit.png`;
-                link.href = canvas.toDataURL("image/png");
-                link.click();
+            html2canvas(document.getElementById('captureArea'), { useCORS: true, scale: 2 }).then(canvas => {
+                const link = document.createElement('a'); link.download = `Fiche.png`; link.href = canvas.toDataURL(); link.click();
             });
         },
 
         shareProductLink() {
             const config = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-            const phoneForLink = (config.ceoWhatsapp || "").replace(/\s+/g, '').replace('+', '');
-            const msg = `*DEMANDE DE COMMANDE*\nJe souhaite commander : ${document.getElementById('modalTitle').innerText} (Ref: ${document.getElementById('modalUniqueIdDisplay').innerText})`;
-            window.open(`https://wa.me/${phoneForLink}?text=${encodeURIComponent(msg)}`, '_blank');
+            window.open(`https://wa.me/${(config.ceoWhatsapp || "").replace(/\D/g,'')}?text=Je souhaite commander : ${document.getElementById('modalTitle').innerText}`, '_blank');
         },
 
         deleteCurrentProduct() {
             if(confirm("Supprimer ?")) {
                 const id = document.getElementById('currentProductId').value;
-                remove(ref(db, 'produits/' + id)).then(() => {
-                    bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
-                });
+                if (window.firebaseDB) window.firebaseDB.remove(window.firebaseDB.ref(window.firebaseDB.db, 'products/' + id));
+                bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
             }
         },
 
@@ -1053,17 +1077,13 @@
             tbody.innerHTML = products.map(p => `
                 <tr>
                     <td><code class="small">${p.uniqueId}</code></td>
-                    <td><b>${p.name}</b> <small class="text-muted">(V${p.currentWave || 1})</small></td>
+                    <td><b>${p.name}</b></td>
                     <td><span class="badge ${p.stock > 0 ? 'bg-success' : 'bg-secondary'}">${p.stock || 0}</span></td>
-                    <td>${p.canaux?.avion?.vente ? '✈️' : ''} ${p.canaux?.bateau?.vente ? '🚢' : ''} ${p.canaux?.direct?.ttc ? '🏠' : ''}</td>
+                    <td>${p.canaux?.avion?.vente ? '✈️' : ''} ${p.canaux?.bateau?.vente ? '🚢' : ''}</td>
                     <td class="text-end">
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary" onclick="Shop.duplicateProduct(${p.id})"><i class="bi bi-copy"></i></button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="Shop.deleteProduct(${p.id})"><i class="bi bi-trash"></i></button>
-                        </div>
+                        <button class="btn btn-sm btn-outline-danger" onclick="Shop.deleteProduct(${p.id})"><i class="bi bi-trash"></i></button>
                     </td>
-                </tr>
-            `).join('');
+                </tr>`).join('');
         },
 
         renderOrdersTable() {
@@ -1073,37 +1093,16 @@
                 <tr>
                     <td><small>${o.date}</small></td>
                     <td><b>${o.client}</b></td>
-                    <td>${o.prodName} (x${o.qty}) <small class="text-muted">V${o.wave}</small></td>
+                    <td>${o.prodName} (x${o.qty})</td>
                     <td class="fw-bold">${o.total.toLocaleString()}</td>
                     <td><span class="badge ${o.status === 'Validée' ? 'bg-success' : 'bg-info'}">${o.status}</span></td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-danger" onclick="Shop.deleteOrder(${o.id})"><i class="bi bi-trash-fill"></i></button>
-                    </td>
-                </tr>
-            `).reverse().join('');
+                    <td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="Shop.deleteOrder('${o.id}')"><i class="bi bi-trash"></i></button></td>
+                </tr>`).reverse().join('');
         },
 
-        deleteOrder(id) {
-            if(confirm("Supprimer ?")) { orders = orders.filter(o => o.id != id); localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); this.renderOrdersTable(); }
-        },
-
-        duplicateProduct(id) {
-            const p = products.find(x => x.id === id);
-            const clone = JSON.parse(JSON.stringify(p));
-            clone.id = Date.now();
-            clone.uniqueId = "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase();
-            clone.name += " (Copie)"; clone.currentWave = 1;
-            set(ref(db, 'produits/' + clone.id), clone);
-        },
-
-        deleteProduct(id) {
-            if(confirm("Supprimer ?")) {
-                remove(ref(db, 'produits/' + id));
-            }
-        },
-
+        deleteOrder(id) { if(confirm("Supprimer ?") && window.firebaseDB) window.firebaseDB.remove(window.firebaseDB.ref(window.firebaseDB.db, 'orders/' + id)); },
+        deleteProduct(id) { if(confirm("Supprimer ?") && window.firebaseDB) window.firebaseDB.remove(window.firebaseDB.ref(window.firebaseDB.db, 'products/' + id)); },
         search() { const q = document.getElementById('searchInput').value.toLowerCase(); this.render(products.filter(p => p.name.toLowerCase().includes(q))); },
-
         filter(cat, el) {
             document.querySelectorAll('.cat-badge').forEach(b => b.classList.remove('active'));
             el.classList.add('active');
@@ -1111,37 +1110,18 @@
         }
     };
 
-    window.Shop = Shop;
+    document.getElementById('pImgFile').onchange = function(e) {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = function(event) { document.getElementById('pImgBase64').value = event.target.result; };
+        reader.readAsDataURL(file);
+    };
 
-    const imgInput = document.getElementById('pImgFile');
-    if(imgInput) {
-        imgInput.onchange = function(e) {
-            const file = e.target.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            reader.onload = function(event) { document.getElementById('pImgBase64').value = event.target.result; };
-            reader.readAsDataURL(file);
-        };
-    }
-
-    const addForm = document.getElementById('addProductForm');
-    if(addForm) {
-        addForm.onsubmit = function(e) {
-            Shop.saveProduct(e);
-        };
-    }
+    document.getElementById('addProductForm').onsubmit = function(e) { Shop.saveProduct(e); };
 
     window.onload = () => { Shop.init(); };
 
-</script>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
-    <i class="bi bi-power fs-4"></i>
-</button>
-
-<script>
     function logout() {
         if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
             localStorage.removeItem('BONE_USER_SESSION');
@@ -1149,6 +1129,12 @@
         }
     }
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
+    <i class="bi bi-power fs-4"></i>
+</button>
 
 </body>
 </html>

@@ -149,6 +149,15 @@
     </section>
 </main>
 
+<div id="adminNotifyBtn" class="position-fixed bottom-0 start-0 m-3 d-none" style="z-index: 2001;">
+    <button class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center" 
+            style="width: 60px; height: 60px; background: var(--canva-gradient); border: 2px solid white;"
+            onclick="AdminNotif.openModal()">
+        <i class="bi bi-bell-fill fs-4"></i>
+        <span id="notifCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+    </button>
+</div>
+
 <div class="modal fade" id="orderModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
         <div class="modal-content shadow-lg">
@@ -228,10 +237,43 @@
     </div>
 </div>
 
-<script>
-    // Vérification stricte Admin
-    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+<div class="modal fade" id="notifModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 25px;">
+            <div class="modal-header border-0 text-white" style="background: var(--canva-gradient); border-radius: 25px 25px 0 0;">
+                <h5 class="modal-title fw-bold"><i class="bi bi-activity me-2"></i>Derniers Mouvements</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="d-flex justify-content-between mb-3 gap-2">
+                    <input type="text" id="notifFilter" class="form-control rounded-pill w-50" placeholder="Filtrer par utilisateur..." oninput="AdminNotif.render()">
+                    <button class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="AdminNotif.clearHistory()">Réinitialiser</button>
+                </div>
+                <div id="notifList" style="max-height: 400px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, onValue, update, remove, push, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    const firebaseConfig = {  
+        apiKey: "AIzaSyCaLdUMDuWSfg7118-ZFpL1fARkM_BQ2zw",  
+        authDomain: "b-one-database.firebaseapp.com",  
+        projectId: "b-one-database",  
+        storageBucket: "b-one-database.firebasestorage.app",  
+        messagingSenderId: "423962812169",  
+        appId: "1:423962812169:web:34961a338fe06e693e7dd8",
+        databaseURL: "https://b-one-database-default-rtdb.firebaseio.com/"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Initialisation globale pour que le HTML puisse appeler les fonctions
+    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
     if (!session || session.role !== 'admin') {
         alert("Accès refusé. Seul l'administrateur peut accéder à cette page.");
         window.location.href = 'login.html';
@@ -239,20 +281,34 @@
 
     const CONFIG_KEY = 'BONE_OFFICIAL_CONFIG_V2';
     const DB_KEY = 'BONE_PRODUCTS_LIST';
-    const ORDERS_KEY = 'BONE_ORDERS_HISTORY'; // Clé synchronisée avec Panier
+    const ORDERS_KEY = 'BONE_ORDERS_HISTORY';
 
-    let products = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-    let userOrders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
-    let selectedOrder = null;
-    let orderModalObj = null;
-    let publishModalObj = null;
+    window.Shop = {
+        userOrders: [],
+        products: [],
 
-    const Shop = {
         init() {
-            orderModalObj = new bootstrap.Modal(document.getElementById('orderModal'));
-            publishModalObj = new bootstrap.Modal(document.getElementById('publishModal'));
-            this.renderOrders();
+            window.orderModalObj = new bootstrap.Modal(document.getElementById('orderModal'));
+            window.publishModalObj = new bootstrap.Modal(document.getElementById('publishModal'));
             this.loadBranding();
+            this.listenToFirebase();
+        },
+
+        listenToFirebase() {
+            // Synchro Commandes
+            onValue(ref(db, 'orders'), (snapshot) => {
+                const data = snapshot.val();
+                this.userOrders = data ? Object.values(data) : [];
+                localStorage.setItem(ORDERS_KEY, JSON.stringify(this.userOrders));
+                this.renderOrders();
+            });
+
+            // Synchro Produits
+            onValue(ref(db, 'products'), (snapshot) => {
+                const data = snapshot.val();
+                this.products = data ? Object.values(data) : [];
+                localStorage.setItem(DB_KEY, JSON.stringify(this.products));
+            });
         },
 
         loadBranding() {
@@ -263,37 +319,32 @@
                     document.getElementById('navCompanyName').innerText = config.companyName;
                     document.getElementById('pubCompanyName').innerText = config.companyName;
                 }
-                if(config.ceoName) {
-                    document.getElementById('pubCEO').innerText = config.ceoName;
-                }
+                if(config.ceoName) document.getElementById('pubCEO').innerText = config.ceoName;
             }
         },
 
         renderOrders() {
-            const query = document.getElementById('orderSearchInput').value.toLowerCase();
+            const queryText = document.getElementById('orderSearchInput').value.toLowerCase();
             const table = document.getElementById('customerOrdersTable');
-            userOrders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
-
-            const filteredOrders = userOrders.filter(o => 
-                (o.prodName && o.prodName.toLowerCase().includes(query)) || 
-                (o.client && o.client.toLowerCase().includes(query))
+            
+            const filtered = this.userOrders.filter(o => 
+                (o.prodName && o.prodName.toLowerCase().includes(queryText)) || 
+                (o.client && o.client.toLowerCase().includes(queryText))
             );
             
-            if (filteredOrders.length === 0) {
+            if (filtered.length === 0) {
                 table.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-4">Aucune commande enregistrée.</td></tr>`;
                 return;
             }
             
-            table.innerHTML = filteredOrders.map((o) => {
+            table.innerHTML = filtered.map((o) => {
                 const qte = parseInt(o.quantity || o.qty) || 1;
                 const totalDu = ((parseFloat(o.price) || 0) + (parseFloat(o.transit) || 0) + (parseFloat(o.douane) || 0) + (parseFloat(o.livraison) || 0)) * qte;
-                
                 let paid = 0;
                 if(o.isPricePayed) paid += (parseFloat(o.price) || 0) * qte;
                 if(o.isTransitPayed) paid += (parseFloat(o.transit) || 0) * qte;
                 if(o.isDouanePayed) paid += (parseFloat(o.douane) || 0) * qte;
                 if(o.isLivraisonPayed) paid += (parseFloat(o.livraison) || 0) * qte;
-
                 const reste = totalDu - paid;
                 return `
                 <tr class="clickable-order-row" onclick="Shop.editOrder('${o.id}')">
@@ -310,29 +361,24 @@
         },
 
         editOrder(orderId) {
-            selectedOrder = userOrders.find(o => o.id === orderId);
-            if(!selectedOrder) return;
-
-            const p = products.find(prod => prod.id === selectedOrder.prodId) || {};
-            const qte = parseInt(selectedOrder.quantity || selectedOrder.qty) || 1;
-
+            window.selectedOrder = this.userOrders.find(o => o.id === orderId);
+            if(!window.selectedOrder) return;
+            const p = this.products.find(prod => prod.id === window.selectedOrder.prodId) || {};
+            const qte = parseInt(window.selectedOrder.quantity || window.selectedOrder.qty) || 1;
             document.getElementById('editOrderId').value = orderId;
-            document.getElementById('orderModalImg').src = p.img || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-            document.getElementById('orderModalTitle').innerText = selectedOrder.prodName || 'Produit';
-            document.getElementById('displayClientName').innerText = `Client: ${selectedOrder.client || 'Inconnu'} (Qté: ${qte})`;
-            
-            document.getElementById('valBase').innerText = (parseFloat(selectedOrder.price) * qte).toLocaleString();
-            document.getElementById('valTransit').innerText = (parseFloat(selectedOrder.transit) * qte).toLocaleString();
-            document.getElementById('valDouane').innerText = (parseFloat(selectedOrder.douane) * qte).toLocaleString();
-            document.getElementById('valLivr').innerText = (parseFloat(selectedOrder.livraison) * qte).toLocaleString();
-            
-            document.getElementById('paidBase').value = selectedOrder.isPricePayed ? (parseFloat(selectedOrder.price) * qte) : 0;
-            document.getElementById('paidTransit').value = selectedOrder.isTransitPayed ? (parseFloat(selectedOrder.transit) * qte) : 0;
-            document.getElementById('paidDouane').value = selectedOrder.isDouanePayed ? (parseFloat(selectedOrder.douane) * qte) : 0;
-            document.getElementById('paidLivr').value = selectedOrder.isLivraisonPayed ? (parseFloat(selectedOrder.livraison) * qte) : 0;
-            
+            document.getElementById('orderModalImg').src = p.img || '';
+            document.getElementById('orderModalTitle').innerText = window.selectedOrder.prodName;
+            document.getElementById('displayClientName').innerText = `Client: ${window.selectedOrder.client} (Qté: ${qte})`;
+            document.getElementById('valBase').innerText = (parseFloat(window.selectedOrder.price) * qte).toLocaleString();
+            document.getElementById('valTransit').innerText = (parseFloat(window.selectedOrder.transit) * qte).toLocaleString();
+            document.getElementById('valDouane').innerText = (parseFloat(window.selectedOrder.douane) * qte).toLocaleString();
+            document.getElementById('valLivr').innerText = (parseFloat(window.selectedOrder.livraison) * qte).toLocaleString();
+            document.getElementById('paidBase').value = window.selectedOrder.isPricePayed ? (parseFloat(window.selectedOrder.price) * qte) : 0;
+            document.getElementById('paidTransit').value = window.selectedOrder.isTransitPayed ? (parseFloat(window.selectedOrder.transit) * qte) : 0;
+            document.getElementById('paidDouane').value = window.selectedOrder.isDouanePayed ? (parseFloat(window.selectedOrder.douane) * qte) : 0;
+            document.getElementById('paidLivr').value = window.selectedOrder.isLivraisonPayed ? (parseFloat(window.selectedOrder.livraison) * qte) : 0;
             this.updateTotalDisplay();
-            orderModalObj.show();
+            window.orderModalObj.show();
         },
 
         settleItem(inputId, valId) {
@@ -342,60 +388,63 @@
         },
 
         updateTotalDisplay() {
-            if(!selectedOrder) return;
-            const qte = parseInt(selectedOrder.quantity || selectedOrder.qty) || 1;
-            const totalDu = ((parseFloat(selectedOrder.price) || 0) + (parseFloat(selectedOrder.transit) || 0) + (parseFloat(selectedOrder.douane) || 0) + (parseFloat(selectedOrder.livraison) || 0)) * qte;
-            
+            const qte = parseInt(window.selectedOrder.quantity || window.selectedOrder.qty) || 1;
+            const totalDu = ((parseFloat(window.selectedOrder.price) || 0) + (parseFloat(window.selectedOrder.transit) || 0) + (parseFloat(window.selectedOrder.douane) || 0) + (parseFloat(window.selectedOrder.livraison) || 0)) * qte;
             const pBase = parseFloat(document.getElementById('paidBase').value) || 0;
             const pTransit = parseFloat(document.getElementById('paidTransit').value) || 0;
             const pDouane = parseFloat(document.getElementById('paidDouane').value) || 0;
             const pLivr = parseFloat(document.getElementById('paidLivr').value) || 0;
-            
-            const totalPaye = pBase + pTransit + pDouane + pLivr;
-            const reste = totalDu - totalPaye;
+            const reste = totalDu - (pBase + pTransit + pDouane + pLivr);
             document.getElementById('orderTotalDisplay').innerText = `${reste.toLocaleString()} F CFA`;
         },
 
         submitDirectOrder() {
             const orderId = document.getElementById('editOrderId').value;
-            const orderIndex = userOrders.findIndex(o => o.id === orderId);
-            if(orderIndex === -1) return;
+            const o = this.userOrders.find(ord => ord.id === orderId);
+            const qte = parseInt(o.quantity || o.qty) || 1;
             
-            const qte = parseInt(userOrders[orderIndex].quantity || userOrders[orderIndex].qty) || 1;
-            
-            // Mise à jour des booléens de paiement selon les montants saisis
-            userOrders[orderIndex].isPricePayed = (parseFloat(document.getElementById('paidBase').value) >= (parseFloat(userOrders[orderIndex].price) * qte));
-            userOrders[orderIndex].isTransitPayed = (parseFloat(document.getElementById('paidTransit').value) >= (parseFloat(userOrders[orderIndex].transit) * qte));
-            userOrders[orderIndex].isDouanePayed = (parseFloat(document.getElementById('paidDouane').value) >= (parseFloat(userOrders[orderIndex].douane) * qte));
-            userOrders[orderIndex].isLivraisonPayed = (parseFloat(document.getElementById('paidLivraison').value) >= (parseFloat(userOrders[orderIndex].livraison) * qte));
-            
-            localStorage.setItem(ORDERS_KEY, JSON.stringify(userOrders));
-            orderModalObj.hide();
-            this.renderOrders();
-            alert("Situation de paiement mise à jour.");
+            // Logique de validation
+            const isVenteOk = parseFloat(document.getElementById('paidBase').value) >= (parseFloat(o.price) * qte);
+            const isTransitOk = parseFloat(document.getElementById('paidTransit').value) >= (parseFloat(o.transit) * qte);
+            const isDouaneOk = parseFloat(document.getElementById('paidDouane').value) >= (parseFloat(o.douane) * qte);
+            const isLivrOk = parseFloat(document.getElementById('paidLivr').value) >= (parseFloat(o.livraison) * qte);
+
+            update(ref(db, `orders/${orderId}`), {
+                isPricePayed: isVenteOk,
+                isTransitPayed: isTransitOk,
+                isDouanePayed: isDouaneOk,
+                isLivraisonPayed: isLivrOk
+            });
+
+            // Notification de modification
+            push(ref(db, 'notifications'), {
+                userId: session.name,
+                details: `Paiement mis à jour pour ${o.client} (${o.prodName})`,
+                timestamp: Date.now(),
+                read: false
+            });
+
+            window.orderModalObj.hide();
+            alert("Situation de paiement mise à jour et synchronisée.");
         },
 
         openPublishModal() {
             document.getElementById('pubDate').innerText = `Date : ${new Date().toLocaleDateString('fr-FR', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}`;
             const container = document.getElementById('publishOrdersList');
-            
-            if(userOrders.length === 0) {
+            if(this.userOrders.length === 0) {
                 container.innerHTML = `<p class="text-center py-4">Aucune donnée à publier.</p>`;
             } else {
-                container.innerHTML = userOrders.map(o => {
+                container.innerHTML = this.userOrders.map(o => {
                     const qte = parseInt(o.quantity || o.qty) || 1;
                     const vTotal = (parseFloat(o.price) || 0) * qte;
                     const tTotal = (parseFloat(o.transit) || 0) * qte;
                     const dTotal = (parseFloat(o.douane) || 0) * qte;
-                    
                     const vPaid = o.isPricePayed ? vTotal : 0;
                     const tPaid = o.isTransitPayed ? tTotal : 0;
                     const dPaid = o.isDouanePayed ? dTotal : 0;
-                    
                     const totalDu = vTotal + tTotal + dTotal + ((parseFloat(o.livraison)||0)*qte);
                     const paid = vPaid + tPaid + dPaid + (o.isLivraisonPayed ? ((parseFloat(o.livraison)||0)*qte) : 0);
                     const reste = totalDu - paid;
-
                     return `
                     <div class="publish-item">
                         <h6 class="fw-bold mb-1">${o.client} - ${o.prodName} <span class="badge bg-light text-dark border small">V${o.wave||1}</span></h6>
@@ -408,87 +457,93 @@
                     </div>`;
                 }).join('');
             }
-            publishModalObj.show();
+            window.publishModalObj.show();
         },
 
         copyAndShareWhatsApp() {
-            if(userOrders.length === 0) return alert("Rien à partager.");
-            
             const company = document.getElementById('pubCompanyName').innerText;
             const dateStr = document.getElementById('pubDate').innerText;
             const ceo = document.getElementById('pubCEO').innerText;
-            
-            let text = `📢 *${company} - BULLETIN OFFICIEL*\n`;
-            text += `📅 _${dateStr}_\n\n`;
-            text += `*SITUATION DES PAIEMENTS :*\n`;
-            text += `-----------------------------------\n\n`;
-
-            userOrders.forEach(o => {
+            let text = `📢 *${company} - BULLETIN OFFICIEL*\n📅 _${dateStr}_\n\n*SITUATION DES PAIEMENTS :*\n-----------------------------------\n\n`;
+            this.userOrders.forEach(o => {
                 const qte = parseInt(o.quantity || o.qty) || 1;
-                const vTotal = (parseFloat(o.price) || 0) * qte;
-                const tTotal = (parseFloat(o.transit) || 0) * qte;
-                const dTotal = (parseFloat(o.douane) || 0) * qte;
-                const vPaid = o.isPricePayed ? vTotal : 0;
-                const tPaid = o.isTransitPayed ? tTotal : 0;
-                const dPaid = o.isDouanePayed ? dTotal : 0;
-                const totalDu = vTotal + tTotal + dTotal + ((parseFloat(o.livraison)||0)*qte);
-                const paid = vPaid + tPaid + dPaid + (o.isLivraisonPayed ? ((parseFloat(o.livraison)||0)*qte) : 0);
-                const reste = totalDu - paid;
-                
-                text += `👤 *Client :* ${o.client}\n`;
-                text += `📦 *Produit :* ${o.prodName} (V${o.wave||1})\n`;
-                text += `💵 *Vente :* ${vPaid.toLocaleString()} / ${vTotal.toLocaleString()} ${o.isPricePayed ? '✅' : '❌'}\n`;
-                text += `🚢 *Transit :* ${tPaid.toLocaleString()} / ${tTotal.toLocaleString()} ${o.isTransitPayed ? '✅' : '❌'}\n`;
-                text += `🛃 *Douane :* ${dPaid.toLocaleString()} / ${dTotal.toLocaleString()} ${o.isDouanePayed ? '✅' : '❌'}\n`;
-                text += `❌ *RESTE :* ${reste.toLocaleString()} F CFA\n`;
-                text += `-----------------------------------\n\n`;
+                const vT = (parseFloat(o.price) || 0) * qte;
+                const tT = (parseFloat(o.transit) || 0) * qte;
+                const dT = (parseFloat(o.douane) || 0) * qte;
+                const totalDu = vT + tT + dT + ((parseFloat(o.livraison)||0)*qte);
+                const paid = (o.isPricePayed?vT:0) + (o.isTransitPayed?tT:0) + (o.isDouanePayed?dT:0) + (o.isLivraisonPayed?((parseFloat(o.livraison)||0)*qte):0);
+                text += `👤 *Client :* ${o.client}\n📦 *Produit :* ${o.prodName} (V${o.wave||1})\n💵 *Vente :* ${o.isPricePayed?'✅ OK':'❌ '+(vT-(o.isPricePayed?vT:0)).toLocaleString()}\n❌ *RESTE :* ${(totalDu-paid).toLocaleString()} F CFA\n-----------------------------------\n\n`;
             });
-
             text += `\n✍️ *Signé :*\n*${ceo}*\n_PDG_`;
-
             navigator.clipboard.writeText(text).then(() => {
-                alert("Rapport copié ! Redirection vers WhatsApp...");
+                alert("Rapport copié ! Redirection WhatsApp...");
                 window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
             });
         }
     };
 
-    window.onload = () => Shop.init();
+    // SYSTEME DE NOTIFICATION ADMIN
+    window.AdminNotif = {
+        items: [],
+        init() {
+            if(session.role === 'admin') {
+                document.getElementById('adminNotifyBtn').classList.remove('d-none');
+                this.listen();
+            }
+        },
+        listen() {
+            onValue(ref(db, 'notifications'), (snap) => {
+                const data = snap.val();
+                this.items = data ? Object.entries(data).map(([id,v])=>({id,...v})).reverse() : [];
+                const unread = this.items.filter(n => !n.read).length;
+                const badge = document.getElementById('notifCount');
+                badge.innerText = unread;
+                badge.classList.toggle('d-none', unread === 0);
+                this.render();
+            });
+        },
+        render() {
+            const container = document.getElementById('notifList');
+            const filter = document.getElementById('notifFilter').value.toLowerCase();
+            container.innerHTML = this.items
+                .filter(n => n.userId.toLowerCase().includes(filter))
+                .map(n => `
+                <div class="card mb-2 border-0 shadow-sm ${n.read ? 'opacity-75' : 'border-start border-primary border-4'}">
+                    <div class="card-body p-2 d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-light text-primary small">${n.userId}</span>
+                            <p class="mb-0 small fw-bold">${n.details}</p>
+                            <small class="text-muted" style="font-size:0.7rem">${new Date(n.timestamp).toLocaleString()}</small>
+                        </div>
+                        ${!n.read ? `<button class="btn btn-sm btn-link text-decoration-none" onclick="AdminNotif.markRead('${n.id}')">Marquer lu</button>` : ''}
+                    </div>
+                </div>`).join('') || '<p class="text-center text-muted small">Aucun mouvement.</p>';
+        },
+        markRead(id) { update(ref(db, `notifications/${id}`), { read: true }); },
+        clearHistory() {
+            if(prompt("Code Admin pour supprimer :") === "0000") {
+                remove(ref(db, 'notifications'));
+            }
+        },
+        openModal() { new bootstrap.Modal(document.getElementById('notifModal')).show(); }
+    };
+
+    window.onload = () => {
+        Shop.init();
+        AdminNotif.init();
+    };
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(registration => {
-                    console.log('Service Worker enregistré avec succès:', registration.scope);
-                })
-                .catch(error => {
-                    console.error('L\'enregistrement du Service Worker a échoué:', error);
-                });
-        });
-    }
-</script>
-
 
 <button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
     <i class="bi bi-power fs-4"></i>
 </button>
 
 <script>
-    /**
-     * Fonction de déconnexion globale
-     * Supprime la session et redirige vers la page de login
-     */
     function logout() {
-        // Une petite confirmation pour éviter les erreurs de manipulation
         if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
-            // 1. On supprime la clé de session spécifique
             localStorage.removeItem('BONE_USER_SESSION');
-            
-            // 2. Redirection immédiate
             window.location.href = 'login.html';
         }
     }
