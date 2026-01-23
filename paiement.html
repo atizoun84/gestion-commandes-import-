@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>B-one | Suivi paiement & Logistique</title>
+    <title>B-one | Suivi paiement</title>
     
     <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#7d2ae8">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#7d2ae8">
+    <meta name="apple-mobile-web-app-title" content="B-one Paiement">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
@@ -84,20 +86,13 @@
         .publish-item { border-left: 4px solid #00c4cc; padding-left: 15px; margin-bottom: 15px; }
         .signature-area { margin-top: 30px; font-style: italic; border-top: 1px solid #eee; padding-top: 10px; }
 
-        /* Logistics Styles */
-        .logistics-step { border: 1px solid #eee; border-radius: 15px; padding: 10px; margin-bottom: 8px; transition: 0.3s; }
-        .logistics-step.completed { background: #e6fcf5; border-color: #0ca678; }
-
-        @media print {
-            .no-print { display: none !important; }
-            .modal-content { border: none !important; box-shadow: none !important; }
-            body { background: white; }
-        }
+        .btn-settle { padding: 2px 10px; font-size: 0.7rem; border-radius: 20px; float: right; }
+        .text-purple { color: var(--canva-purple); }
     </style>
 </head>
 <body>
 
-<header class="app-header shadow-lg no-print">
+<header class="app-header shadow-lg">
     <nav class="navbar navbar-expand-lg navbar-dark container">
         <div class="container-fluid px-0">
             <a class="navbar-brand d-flex align-items-center gap-2" href="#">
@@ -107,9 +102,26 @@
                     <small class="opacity-75" style="font-size: 0.65rem;">Suivi paiement</small>
                 </div>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
+
+            <div class="ms-auto d-flex align-items-center">
+                <div class="position-relative d-inline-block me-3" id="adminNotifGroup" style="display:none !important;">
+                    <button class="btn btn-light rounded-circle shadow-sm" data-bs-toggle="dropdown">
+                        <i class="bi bi-bell-fill text-purple"></i>
+                        <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" id="notifList" style="width: 300px; max-height: 400px; overflow-y: auto;">
+                        <li class="dropdown-header">Derniers mouvements</li>
+                        <div id="notifItems"></div>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button onclick="clearAllNotifs()" class="dropdown-item text-center text-danger fw-bold">Supprimer l'historique (Code requis)</button></li>
+                    </ul>
+                </div>
+
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+            </div>
+
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
                     <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
@@ -126,36 +138,27 @@
 </header>
 
 <main class="container px-4">
-    <div class="search-container no-print">
+    <div class="search-container">
         <i class="bi bi-search search-icon"></i>
-        <input type="text" id="orderSearchInput" class="form-control search-input" placeholder="Rechercher par client..." onkeyup="Shop.renderOrders()">
+        <input type="text" id="orderSearchInput" class="form-control search-input" placeholder="Rechercher une commande par nom ou produit..." onkeyup="Shop.renderOrders()">
     </div>
 
-    <div class="mt-4 no-print">
-        <label class="form-label fw-bold">Filtrer par Produit :</label>
-        <select id="productFilter" class="form-select rounded-pill" onchange="Shop.renderOrders()">
-            <option value="all">Tous les produits</option>
-        </select>
-    </div>
+    <div id="productGrid"></div>
 
     <section class="orders-section" id="customerOrdersSection">
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-            <h2 class="h5 fw-bold mb-0"><i class="bi bi-wallet2 text-primary me-2"></i>Tableau de Bord</h2>
-            <div class="d-flex gap-2">
-                <button class="btn btn-outline-primary btn-sm rounded-pill px-3 no-print" onclick="window.print()"><i class="bi bi-printer"></i></button>
-                <button class="btn btn-dark rounded-pill px-4 fw-bold shadow-sm no-print" onclick="Shop.openPublishModal()">
-                    <i class="bi bi-send-fill me-2 text-info"></i>PUBLIER
-                </button>
-            </div>
+            <h2 class="h5 fw-bold mb-0"><i class="bi bi-wallet2 text-primary me-2"></i>Tableau de Bord des Paiements</h2>
+            <button class="btn btn-dark rounded-pill px-4 fw-bold shadow-sm" onclick="Shop.openPublishModal()">
+                <i class="bi bi-send-fill me-2 text-info"></i>PUBLIER COMMANDE
+            </button>
         </div>
         <div class="table-responsive">
             <table class="table align-middle">
                 <thead class="table-light small">
                     <tr>
-                        <th>Date</th>
+                        <th>Vague</th>
                         <th>Client & Produit</th>
                         <th class="text-end">Reste à Payer</th>
-                        <th class="text-center">Action</th>
                     </tr>
                 </thead>
                 <tbody id="customerOrdersTable" class="small"></tbody>
@@ -165,9 +168,9 @@
 </main>
 
 <div class="modal fade" id="orderModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-fullscreen-sm-down">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
         <div class="modal-content shadow-lg">
-            <div class="modal-header-img no-print">
+            <div class="modal-header-img">
                 <button type="button" class="btn-close float-end" data-bs-dismiss="modal"></button>
                 <img id="orderModalImg" src="" class="modal-product-img-lg mt-3">
                 <div class="mt-2">
@@ -176,79 +179,36 @@
                 </div>
             </div>
             <div class="modal-body p-4">
-                <div class="row">
-                    <div class="col-md-6 border-end">
-                        <h6 class="fw-bold mb-3 text-primary border-bottom pb-2">PAIEMENT</h6>
-                        <form id="directOrderForm">
-                            <input type="hidden" id="editOrderId">
-                            <div class="mb-2 d-flex justify-content-between align-items-center bg-light p-2 rounded">
-                                <span class="small fw-bold">Vente: <span id="valBase">0</span></span>
-                                <input class="form-check-input" type="checkbox" id="paidBaseCheck" onchange="Shop.updateTotalDisplay()">
-                            </div>
-                            <div class="mb-2 d-flex justify-content-between align-items-center bg-light p-2 rounded">
-                                <span class="small fw-bold">Transit: <span id="valTransit">0</span></span>
-                                <input class="form-check-input" type="checkbox" id="paidTransitCheck" onchange="Shop.updateTotalDisplay()">
-                            </div>
-                            <div class="mb-2 d-flex justify-content-between align-items-center bg-light p-2 rounded">
-                                <span class="small fw-bold">Douane: <span id="valDouane">0</span></span>
-                                <input class="form-check-input" type="checkbox" id="paidDouaneCheck" onchange="Shop.updateTotalDisplay()">
-                            </div>
-                            <div class="mb-2 d-flex justify-content-between align-items-center bg-light p-2 rounded">
-                                <span class="small fw-bold">Livraison: <span id="valLivraison">0</span></span>
-                                <input class="form-check-input" type="checkbox" id="paidLivraisonCheck" onchange="Shop.updateTotalDisplay()">
-                            </div>
-                            <div class="p-2 bg-dark text-white rounded-3 mb-3 text-center">
-                                <small class="d-block opacity-75" style="font-size:0.7rem">RESTE À PAYER</small>
-                                <span class="h5 fw-bold" id="orderTotalDisplay">0 F CFA</span>
-                            </div>
-                        </form>
+                <form id="directOrderForm">
+                    <input type="hidden" id="editOrderId">
+                    <div class="mb-3">
+                        <label class="form-label text-primary">Vente (Dû: <span id="valBase">0</span>)</label>
+                        <button type="button" class="btn btn-outline-success btn-settle" onclick="Shop.settleItem('paidBase', 'valBase')">Solder</button>
+                        <input type="number" id="paidBase" class="form-control" placeholder="Montant payé sur la vente" oninput="Shop.updateTotalDisplay()">
                     </div>
-                    <div class="col-md-6">
-                        <h6 class="fw-bold mb-3 text-info border-bottom pb-2">LOGISTIQUE (<span id="originCountry">Origine</span>)</h6>
-                        <div id="logisticsContainer">
-                            <div class="logistics-step" id="step_orig">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="log_orig" onchange="Shop.updateStepStyle(this)">
-                                    <label class="form-check-label small fw-bold" for="log_orig">Achat & Réception Origine</label>
-                                </div>
-                            </div>
-                            <div class="logistics-step" id="step_ship">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="log_ship" onchange="Shop.updateStepStyle(this)">
-                                    <label class="form-check-label small fw-bold" for="log_ship">Expédition / Chargement</label>
-                                </div>
-                            </div>
-                            <div class="logistics-step" id="step_transit">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="log_transit" onchange="Shop.updateStepStyle(this)">
-                                    <label class="form-check-label small fw-bold" for="log_transit">Arrivée & Transit / Douane</label>
-                                </div>
-                            </div>
-                            <div class="logistics-step" id="step_final">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="log_final" onchange="Shop.updateStepStyle(this)">
-                                    <label class="form-check-label small fw-bold" for="log_final">Prêt pour Livraison / Retrait</label>
-                                </div>
-                            </div>
-                            <div class="mt-2">
-                                <label class="form-label" style="font-size:0.7rem">Date Prochaine Étape :</label>
-                                <input type="date" id="nextStepDate" class="form-control form-control-sm">
-                            </div>
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label text-primary">Transit (Dû: <span id="valTransit">0</span>)</label>
+                        <button type="button" class="btn btn-outline-success btn-settle" onclick="Shop.settleItem('paidTransit', 'valTransit')">Solder</button>
+                        <input type="number" id="paidTransit" class="form-control" placeholder="Montant payé sur transit" oninput="Shop.updateTotalDisplay()">
                     </div>
-                </div>
-                <div class="row mt-3 g-2 no-print">
-                    <div class="col-6">
-                        <button type="button" class="btn btn-primary w-100 rounded-pill fw-bold" onclick="Shop.submitDirectOrder()">
-                            <i class="bi bi-save me-1"></i>Enregistrer
-                        </button>
+                    <div class="mb-3">
+                        <label class="form-label text-primary">Douane (Dû: <span id="valDouane">0</span>)</label>
+                        <button type="button" class="btn btn-outline-success btn-settle" onclick="Shop.settleItem('paidDouane', 'valDouane')">Solder</button>
+                        <input type="number" id="paidDouane" class="form-control" placeholder="Montant payé sur douane" oninput="Shop.updateTotalDisplay()">
                     </div>
-                    <div class="col-6">
-                        <button type="button" class="btn btn-success w-100 rounded-pill fw-bold" onclick="Shop.shareOrderWA()">
-                            <i class="bi bi-whatsapp me-1"></i>WhatsApp
-                        </button>
+                    <div class="mb-3">
+                        <label class="form-label text-primary">Livraison (Dû: <span id="valLivr">0</span>)</label>
+                        <button type="button" class="btn btn-outline-success btn-settle" onclick="Shop.settleItem('paidLivr', 'valLivr')">Solder</button>
+                        <input type="number" id="paidLivr" class="form-control" placeholder="Montant payé sur livraison" oninput="Shop.updateTotalDisplay()">
                     </div>
-                </div>
+                    <div class="p-3 bg-light rounded-3 mb-3 border border-danger text-center">
+                        <small class="text-muted d-block mb-1">RESTE À PAYER TOTAL</small>
+                        <span class="h4 fw-bold text-danger" id="orderTotalDisplay">0 F CFA</span>
+                    </div>
+                    <button type="button" class="btn-validate-order" onclick="Shop.submitDirectOrder()">
+                        <i class="bi bi-save me-2"></i>Enregistrer le Paiement
+                    </button>
+                </form>
             </div>
         </div>
     </div>
@@ -258,22 +218,25 @@
     <div class="modal-dialog modal-dialog-scrollable modal-lg modal-fullscreen-sm-down">
         <div class="modal-content shadow-lg border-0">
             <div class="modal-header bg-dark text-white p-4">
-                <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-text me-2"></i>BULLETIN OFFICIEL</h5>
+                <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-text me-2"></i>BULLETIN OFFICIEL DES COMMANDES</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4 p-md-5 bg-white" id="publishContent">
                 <div class="publish-header text-center">
                     <h2 class="h4 fw-bold text-uppercase" id="pubCompanyName">B-ONE GROUP</h2>
-                    <p class="text-muted small mb-0">Rapport de Situation des Commandes</p>
+                    <p class="text-muted small mb-0">Rapport de Situation des Commandes en Cours</p>
                     <small class="text-muted" id="pubDate"></small>
                 </div>
+                
                 <div id="publishOrdersList"></div>
+
                 <div class="signature-area text-end">
                     <p class="mb-0 fw-bold">Le Président Directeur Général,</p>
                     <p class="text-primary fw-bold" id="pubCEO">Atizoun Plateny AMOUSSOU</p>
+                    <small class="text-muted">Signé numériquement</small>
                 </div>
             </div>
-            <div class="modal-footer bg-light p-3 no-print">
+            <div class="modal-footer bg-light p-3">
                 <button class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Fermer</button>
                 <button class="btn btn-success rounded-pill px-4 shadow" onclick="Shop.copyAndShareWhatsApp()">
                     <i class="bi bi-whatsapp me-2"></i>Copier et Partager
@@ -284,18 +247,17 @@
 </div>
 
 <script>
-    // Logique PWA : Enregistrement du Service Worker
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('PWA: Service Worker enregistré !'))
-                .catch(err => console.error('PWA: Erreur d\'enregistrement SW:', err));
-        });
+    // Vérification stricte Admin
+    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+
+    if (!session || session.role !== 'admin') {
+        alert("Accès refusé. Seul l'administrateur peut accéder à cette page.");
+        window.location.href = 'login.html';
     }
 
-    const STORAGE_KEY = 'BONE_OFFICIAL_CONFIG_V2';
+    const CONFIG_KEY = 'BONE_OFFICIAL_CONFIG_V2';
     const DB_KEY = 'BONE_PRODUCTS_LIST';
-    const ORDERS_KEY = 'BONE_ORDERS_HISTORY';
+    const ORDERS_KEY = 'BONE_ORDERS_HISTORY'; // Clé synchronisée avec Panier
 
     let products = JSON.parse(localStorage.getItem(DB_KEY)) || [];
     let userOrders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
@@ -307,219 +269,203 @@
         init() {
             orderModalObj = new bootstrap.Modal(document.getElementById('orderModal'));
             publishModalObj = new bootstrap.Modal(document.getElementById('publishModal'));
-            this.loadBranding();
-            this.fillProductFilter();
             this.renderOrders();
+            this.loadBranding();
         },
 
         loadBranding() {
-            const config = JSON.parse(localStorage.getItem(STORAGE_KEY));
+            const config = JSON.parse(localStorage.getItem(CONFIG_KEY));
             if(config) {
                 if(config.logo) document.getElementById('navLogo').src = config.logo;
                 if(config.companyName) {
                     document.getElementById('navCompanyName').innerText = config.companyName;
                     document.getElementById('pubCompanyName').innerText = config.companyName;
                 }
-                if(config.ceoName) document.getElementById('pubCEO').innerText = config.ceoName;
+                if(config.ceoName) {
+                    document.getElementById('pubCEO').innerText = config.ceoName;
+                }
             }
-        },
-
-        fillProductFilter() {
-            const select = document.getElementById('productFilter');
-            const uniqueProds = [...new Set(userOrders.map(o => o.prodName))];
-            uniqueProds.forEach(name => {
-                const opt = document.createElement('option');
-                opt.value = name;
-                opt.textContent = name;
-                select.appendChild(opt);
-            });
         },
 
         renderOrders() {
             const query = document.getElementById('orderSearchInput').value.toLowerCase();
-            const prodFilter = document.getElementById('productFilter').value;
             const table = document.getElementById('customerOrdersTable');
-            
-            const filteredOrders = userOrders.filter(o => {
-                const matchClient = (o.client && o.client.toLowerCase().includes(query));
-                const matchProd = (prodFilter === 'all' || o.prodName === prodFilter);
-                return matchClient && matchProd;
-            });
+            userOrders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
+
+            const filteredOrders = userOrders.filter(o => 
+                (o.prodName && o.prodName.toLowerCase().includes(query)) || 
+                (o.client && o.client.toLowerCase().includes(query))
+            );
             
             if (filteredOrders.length === 0) {
-                table.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4">Aucune donnée correspondante.</td></tr>`;
+                table.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-4">Aucune commande enregistrée.</td></tr>`;
                 return;
             }
             
-            table.innerHTML = filteredOrders.map(o => {
-                const vBase = parseFloat(o.price) || 0;
-                const tPrice = parseFloat(o.transit) || 0;
-                const dPrice = parseFloat(o.douane) || 0;
-                const lPrice = parseFloat(o.livraison) || 0;
-                let payed = 0;
-                if(o.isPricePayed) payed += vBase;
-                if(o.isTransitPayed) payed += tPrice;
-                if(o.isDouanePayed) payed += dPrice;
-                if(o.isLivraisonPayed) payed += lPrice;
+            table.innerHTML = filteredOrders.map((o) => {
+                const qte = parseInt(o.quantity || o.qty) || 1;
+                const totalDu = ((parseFloat(o.price) || 0) + (parseFloat(o.transit) || 0) + (parseFloat(o.douane) || 0) + (parseFloat(o.livraison) || 0)) * qte;
                 
-                const reste = (vBase + tPrice + dPrice + lPrice) - payed;
-                const dateDisp = o.timestamp ? new Date(o.timestamp).toLocaleDateString('fr-FR') : '-';
+                let paid = 0;
+                if(o.isPricePayed) paid += (parseFloat(o.price) || 0) * qte;
+                if(o.isTransitPayed) paid += (parseFloat(o.transit) || 0) * qte;
+                if(o.isDouanePayed) paid += (parseFloat(o.douane) || 0) * qte;
+                if(o.isLivraisonPayed) paid += (parseFloat(o.livraison) || 0) * qte;
 
+                const reste = totalDu - paid;
                 return `
                 <tr class="clickable-order-row" onclick="Shop.editOrder('${o.id}')">
-                    <td><span class="text-muted">${dateDisp}</span></td>
+                    <td><span class="badge bg-light text-dark border">V${o.wave || 1}</span></td>
                     <td>
-                        <div class="fw-bold text-dark">${o.client || 'Client'}</div>
+                        <div class="fw-bold text-dark">${o.client || 'Client inconnu'}</div>
                         <div class="text-muted" style="font-size: 0.75rem;">${o.prodName || 'Produit'}</div>
                     </td>
-                    <td class="text-end fw-bold text-danger">${reste.toLocaleString()} F</td>
-                    <td class="text-center">
-                        <button class="btn btn-sm btn-outline-primary rounded-pill px-3">Détails</button>
+                    <td class="text-end fw-bold ${reste > 0 ? 'text-danger' : 'text-success'}">
+                        ${reste.toLocaleString()} F CFA
                     </td>
                 </tr>`;
-            }).join('');
+            }).reverse().join('');
         },
 
         editOrder(orderId) {
             selectedOrder = userOrders.find(o => o.id === orderId);
             if(!selectedOrder) return;
+
             const p = products.find(prod => prod.id === selectedOrder.prodId) || {};
-            
-            document.getElementById('editOrderId').value = selectedOrder.id;
-            document.getElementById('orderModalImg').src = p.img || '';
-            document.getElementById('orderModalTitle').innerText = selectedOrder.prodName;
-            document.getElementById('displayClientName').innerText = `Client: ${selectedOrder.client}`;
-            document.getElementById('originCountry').innerText = p.origin || 'Origine';
-            
-            document.getElementById('valBase').innerText = (parseFloat(selectedOrder.price) || 0).toLocaleString();
-            document.getElementById('valTransit').innerText = (parseFloat(selectedOrder.transit) || 0).toLocaleString();
-            document.getElementById('valDouane').innerText = (parseFloat(selectedOrder.douane) || 0).toLocaleString();
-            document.getElementById('valLivraison').innerText = (parseFloat(selectedOrder.livraison) || 0).toLocaleString();
-            
-            document.getElementById('paidBaseCheck').checked = selectedOrder.isPricePayed || false;
-            document.getElementById('paidTransitCheck').checked = selectedOrder.isTransitPayed || false;
-            document.getElementById('paidDouaneCheck').checked = selectedOrder.isDouanePayed || false;
-            document.getElementById('paidLivraisonCheck').checked = selectedOrder.isLivraisonPayed || false;
+            const qte = parseInt(selectedOrder.quantity || selectedOrder.qty) || 1;
 
-            // Logistique
-            document.getElementById('log_orig').checked = selectedOrder.logOrig || false;
-            document.getElementById('log_ship').checked = selectedOrder.logShip || false;
-            document.getElementById('log_transit').checked = selectedOrder.logTransit || false;
-            document.getElementById('log_final').checked = selectedOrder.logFinal || false;
-            document.getElementById('nextStepDate').value = selectedOrder.nextDate || '';
-
-            this.updateStepStyle(document.getElementById('log_orig'));
-            this.updateStepStyle(document.getElementById('log_ship'));
-            this.updateStepStyle(document.getElementById('log_transit'));
-            this.updateStepStyle(document.getElementById('log_final'));
+            document.getElementById('editOrderId').value = orderId;
+            document.getElementById('orderModalImg').src = p.img || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+            document.getElementById('orderModalTitle').innerText = selectedOrder.prodName || 'Produit';
+            document.getElementById('displayClientName').innerText = `Client: ${selectedOrder.client || 'Inconnu'} (Qté: ${qte})`;
+            
+            document.getElementById('valBase').innerText = (parseFloat(selectedOrder.price) * qte).toLocaleString();
+            document.getElementById('valTransit').innerText = (parseFloat(selectedOrder.transit) * qte).toLocaleString();
+            document.getElementById('valDouane').innerText = (parseFloat(selectedOrder.douane) * qte).toLocaleString();
+            document.getElementById('valLivr').innerText = (parseFloat(selectedOrder.livraison) * qte).toLocaleString();
+            
+            document.getElementById('paidBase').value = selectedOrder.isPricePayed ? (parseFloat(selectedOrder.price) * qte) : 0;
+            document.getElementById('paidTransit').value = selectedOrder.isTransitPayed ? (parseFloat(selectedOrder.transit) * qte) : 0;
+            document.getElementById('paidDouane').value = selectedOrder.isDouanePayed ? (parseFloat(selectedOrder.douane) * qte) : 0;
+            document.getElementById('paidLivr').value = selectedOrder.isLivraisonPayed ? (parseFloat(selectedOrder.livraison) * qte) : 0;
             
             this.updateTotalDisplay();
             orderModalObj.show();
         },
 
-        updateStepStyle(input) {
-            const parent = input.closest('.logistics-step');
-            if(input.checked) parent.classList.add('completed');
-            else parent.classList.remove('completed');
+        settleItem(inputId, valId) {
+            const val = document.getElementById(valId).innerText.replace(/\s/g, '');
+            document.getElementById(inputId).value = parseFloat(val);
+            this.updateTotalDisplay();
         },
 
         updateTotalDisplay() {
             if(!selectedOrder) return;
-            const total = (parseFloat(selectedOrder.price)||0) + (parseFloat(selectedOrder.transit)||0) + (parseFloat(selectedOrder.douane)||0) + (parseFloat(selectedOrder.livraison)||0);
-            let payed = 0;
-            if(document.getElementById('paidBaseCheck').checked) payed += parseFloat(selectedOrder.price)||0;
-            if(document.getElementById('paidTransitCheck').checked) payed += parseFloat(selectedOrder.transit)||0;
-            if(document.getElementById('paidDouaneCheck').checked) payed += parseFloat(selectedOrder.douane)||0;
-            if(document.getElementById('paidLivraisonCheck').checked) payed += parseFloat(selectedOrder.livraison)||0;
-            document.getElementById('orderTotalDisplay').innerText = `${(total - payed).toLocaleString()} F CFA`;
+            const qte = parseInt(selectedOrder.quantity || selectedOrder.qty) || 1;
+            const totalDu = ((parseFloat(selectedOrder.price) || 0) + (parseFloat(selectedOrder.transit) || 0) + (parseFloat(selectedOrder.douane) || 0) + (parseFloat(selectedOrder.livraison) || 0)) * qte;
+            
+            const pBase = parseFloat(document.getElementById('paidBase').value) || 0;
+            const pTransit = parseFloat(document.getElementById('paidTransit').value) || 0;
+            const pDouane = parseFloat(document.getElementById('paidDouane').value) || 0;
+            const pLivr = parseFloat(document.getElementById('paidLivr').value) || 0;
+            
+            const totalPaye = pBase + pTransit + pDouane + pLivr;
+            const reste = totalDu - totalPaye;
+            document.getElementById('orderTotalDisplay').innerText = `${reste.toLocaleString()} F CFA`;
         },
 
         submitDirectOrder() {
             const orderId = document.getElementById('editOrderId').value;
-            const idx = userOrders.findIndex(o => o.id === orderId);
-            if(idx === -1) return;
+            const orderIndex = userOrders.findIndex(o => o.id === orderId);
+            if(orderIndex === -1) return;
             
-            userOrders[idx].isPricePayed = document.getElementById('paidBaseCheck').checked;
-            userOrders[idx].isTransitPayed = document.getElementById('paidTransitCheck').checked;
-            userOrders[idx].isDouanePayed = document.getElementById('paidDouaneCheck').checked;
-            userOrders[idx].isLivraisonPayed = document.getElementById('paidLivraisonCheck').checked;
-
-            userOrders[idx].logOrig = document.getElementById('log_orig').checked;
-            userOrders[idx].logShip = document.getElementById('log_ship').checked;
-            userOrders[idx].logTransit = document.getElementById('log_transit').checked;
-            userOrders[idx].logFinal = document.getElementById('log_final').checked;
-            userOrders[idx].nextDate = document.getElementById('nextStepDate').value;
+            const qte = parseInt(userOrders[orderIndex].quantity || userOrders[orderIndex].qty) || 1;
+            
+            // Mise à jour des booléens de paiement selon les montants saisis
+            userOrders[orderIndex].isPricePayed = (parseFloat(document.getElementById('paidBase').value) >= (parseFloat(userOrders[orderIndex].price) * qte));
+            userOrders[orderIndex].isTransitPayed = (parseFloat(document.getElementById('paidTransit').value) >= (parseFloat(userOrders[orderIndex].transit) * qte));
+            userOrders[orderIndex].isDouanePayed = (parseFloat(document.getElementById('paidDouane').value) >= (parseFloat(userOrders[orderIndex].douane) * qte));
+            userOrders[orderIndex].isLivraisonPayed = (parseFloat(document.getElementById('paidLivr').value) >= (parseFloat(userOrders[orderIndex].livraison) * qte));
             
             localStorage.setItem(ORDERS_KEY, JSON.stringify(userOrders));
-
-            // Forcer la mise à jour immédiate vers Google Sheets
-            if(window.SyncManager) {
-                window.SyncManager.pushCategory('orders', 'BONE_ORDERS_HISTORY');
-            }
-
-            this.renderOrders();
             orderModalObj.hide();
-            alert("Données enregistrées !");
-        },
-
-        shareOrderWA() {
-            if(!selectedOrder) return;
-            const dateSuivi = document.getElementById('nextStepDate').value || 'À définir';
-            let msg = `🚚 *SUIVI DE COMMANDE - ${document.getElementById('navCompanyName').innerText}*\n\n`;
-            msg += `👤 *Client :* ${selectedOrder.client}\n`;
-            msg += `📦 *Produit :* ${selectedOrder.prodName}\n`;
-            msg += `---------------------------\n`;
-            msg += `📈 *LOGISTIQUE :*\n`;
-            msg += `${document.getElementById('log_orig').checked ? '✅' : '⏳'} Achat/Réception\n`;
-            msg += `${document.getElementById('log_ship').checked ? '✅' : '⏳'} Expédition\n`;
-            msg += `${document.getElementById('log_transit').checked ? '✅' : '⏳'} Transit/Douane\n`;
-            msg += `${document.getElementById('log_final').checked ? '✅' : '⏳'} Livraison Prête\n\n`;
-            msg += `📅 *Prochaine étape prévue :* ${dateSuivi}\n`;
-            msg += `---------------------------\n`;
-            msg += `💰 *RESTE À PAYER :* ${document.getElementById('orderTotalDisplay').innerText}`;
-
-            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+            this.renderOrders();
+            alert("Situation de paiement mise à jour.");
         },
 
         openPublishModal() {
-            document.getElementById('pubDate').innerText = `Le ${new Date().toLocaleDateString('fr-FR')}`;
+            document.getElementById('pubDate').innerText = `Date : ${new Date().toLocaleDateString('fr-FR', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}`;
             const container = document.getElementById('publishOrdersList');
-            container.innerHTML = userOrders.map(o => {
-                const total = (parseFloat(o.price)||0) + (parseFloat(o.transit)||0) + (parseFloat(o.douane)||0) + (parseFloat(o.livraison)||0);
-                let payed = 0;
-                if(o.isPricePayed) payed += parseFloat(o.price)||0;
-                if(o.isTransitPayed) payed += parseFloat(o.transit)||0;
-                if(o.isDouanePayed) payed += parseFloat(o.douane)||0;
-                if(o.isLivraisonPayed) payed += parseFloat(o.livraison)||0;
-                const status = (o.logFinal) ? "✅ Prêt" : (o.logShip ? "🚢 En Mer" : "🏭 En cours");
+            
+            if(userOrders.length === 0) {
+                container.innerHTML = `<p class="text-center py-4">Aucune donnée à publier.</p>`;
+            } else {
+                container.innerHTML = userOrders.map(o => {
+                    const qte = parseInt(o.quantity || o.qty) || 1;
+                    const vTotal = (parseFloat(o.price) || 0) * qte;
+                    const tTotal = (parseFloat(o.transit) || 0) * qte;
+                    const dTotal = (parseFloat(o.douane) || 0) * qte;
+                    
+                    const vPaid = o.isPricePayed ? vTotal : 0;
+                    const tPaid = o.isTransitPayed ? tTotal : 0;
+                    const dPaid = o.isDouanePayed ? dTotal : 0;
+                    
+                    const totalDu = vTotal + tTotal + dTotal + ((parseFloat(o.livraison)||0)*qte);
+                    const paid = vPaid + tPaid + dPaid + (o.isLivraisonPayed ? ((parseFloat(o.livraison)||0)*qte) : 0);
+                    const reste = totalDu - paid;
 
-                return `
-                <div class="publish-item">
-                    <h6 class="fw-bold mb-1 text-uppercase">${o.client} - ${o.prodName}</h6>
-                    <div class="small">
-                        📍 État : <strong>${status}</strong><br>
-                        💸 Reste : <span class="text-danger fw-bold">${(total-payed).toLocaleString()} F CFA</span>
-                    </div>
-                </div>`;
-            }).join('');
+                    return `
+                    <div class="publish-item">
+                        <h6 class="fw-bold mb-1">${o.client} - ${o.prodName} <span class="badge bg-light text-dark border small">V${o.wave||1}</span></h6>
+                        <div class="small">
+                            <span class="text-muted">Vente:</span> ${vPaid.toLocaleString()} / ${vTotal.toLocaleString()} F CFA ${o.isPricePayed ? '✅' : '❌'}<br>
+                            <span class="text-muted">Transit:</span> ${tPaid.toLocaleString()} / ${tTotal.toLocaleString()} F CFA ${o.isTransitPayed ? '✅' : '❌'}<br>
+                            <span class="text-muted">Douane:</span> ${dPaid.toLocaleString()} / ${dTotal.toLocaleString()} F CFA ${o.isDouanePayed ? '✅' : '❌'}<br>
+                            <span class="text-danger fw-bold">RESTE TOTAL : ${reste.toLocaleString()} F CFA</span>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
             publishModalObj.show();
         },
 
         copyAndShareWhatsApp() {
-            let text = `📢 *${document.getElementById('pubCompanyName').innerText} - POINT DES COMMANDES*\n\n`;
+            if(userOrders.length === 0) return alert("Rien à partager.");
+            
+            const company = document.getElementById('pubCompanyName').innerText;
+            const dateStr = document.getElementById('pubDate').innerText;
+            const ceo = document.getElementById('pubCEO').innerText;
+            
+            let text = `📢 *${company} - BULLETIN OFFICIEL*\n`;
+            text += `📅 _${dateStr}_\n\n`;
+            text += `*SITUATION DES PAIEMENTS :*\n`;
+            text += `-----------------------------------\n\n`;
+
             userOrders.forEach(o => {
-                const total = (parseFloat(o.price)||0) + (parseFloat(o.transit)||0) + (parseFloat(o.douane)||0) + (parseFloat(o.livraison)||0);
-                let payed = 0;
-                if(o.isPricePayed) payed += parseFloat(o.price)||0;
-                if(o.isTransitPayed) payed += parseFloat(o.transit)||0;
-                if(o.isDouanePayed) payed += parseFloat(o.douane)||0;
-                if(o.isLivraisonPayed) payed += parseFloat(o.livraison)||0;
-                const status = o.logFinal ? "PRÊT" : "EN COURS";
-                text += `👤 *${o.client}* | ${o.prodName}\n📍 Statut : ${status}\n❌ Reste : ${(total-payed).toLocaleString()} F\n\n`;
+                const qte = parseInt(o.quantity || o.qty) || 1;
+                const vTotal = (parseFloat(o.price) || 0) * qte;
+                const tTotal = (parseFloat(o.transit) || 0) * qte;
+                const dTotal = (parseFloat(o.douane) || 0) * qte;
+                const vPaid = o.isPricePayed ? vTotal : 0;
+                const tPaid = o.isTransitPayed ? tTotal : 0;
+                const dPaid = o.isDouanePayed ? dTotal : 0;
+                const totalDu = vTotal + tTotal + dTotal + ((parseFloat(o.livraison)||0)*qte);
+                const paid = vPaid + tPaid + dPaid + (o.isLivraisonPayed ? ((parseFloat(o.livraison)||0)*qte) : 0);
+                const reste = totalDu - paid;
+                
+                text += `👤 *Client :* ${o.client}\n`;
+                text += `📦 *Produit :* ${o.prodName} (V${o.wave||1})\n`;
+                text += `💵 *Vente :* ${vPaid.toLocaleString()} / ${vTotal.toLocaleString()} ${o.isPricePayed ? '✅' : '❌'}\n`;
+                text += `🚢 *Transit :* ${tPaid.toLocaleString()} / ${tTotal.toLocaleString()} ${o.isTransitPayed ? '✅' : '❌'}\n`;
+                text += `🛃 *Douane :* ${dPaid.toLocaleString()} / ${dTotal.toLocaleString()} ${o.isDouanePayed ? '✅' : '❌'}\n`;
+                text += `❌ *RESTE :* ${reste.toLocaleString()} F CFA\n`;
+                text += `-----------------------------------\n\n`;
             });
-            text += `\n✍️ *${document.getElementById('pubCEO').innerText}*`;
+
+            text += `\n✍️ *Signé :*\n*${ceo}*\n_PDG_`;
+
             navigator.clipboard.writeText(text).then(() => {
-                alert("Copié ! Redirection WhatsApp...");
+                alert("Rapport copié ! Redirection vers WhatsApp...");
                 window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
             });
         }
@@ -528,7 +474,82 @@
     window.onload = () => Shop.init();
 </script>
 
+<script type="module">
+    import { db, ref, onValue, remove } from './firebase-config.js';
+    
+    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+    if(session && session.role === 'admin') {
+        document.getElementById('adminNotifGroup').style.display = 'inline-block';
+        
+        // Écoute en temps réel des notifications
+        onValue(ref(db, 'notifications'), (snapshot) => {
+            const data = snapshot.val();
+            const badge = document.getElementById('notifBadge');
+            const container = document.getElementById('notifItems');
+            container.innerHTML = '';
+            
+            if(data) {
+                const list = Object.entries(data).reverse(); // Plus récents en premier
+                const unreadCount = list.filter(n => !n[1].read).length;
+                
+                badge.innerText = unreadCount;
+                badge.style.display = unreadCount > 0 ? 'block' : 'none';
+
+                list.forEach(([id, notif]) => {
+                    container.innerHTML += `
+                        <li class="p-2 border-bottom">
+                            <small class="text-muted">${new Date(notif.timestamp).toLocaleString()}</small><br>
+                            <strong>${notif.user}</strong>: ${notif.type}<br>
+                            <span class="text-secondary small">${JSON.stringify(notif.details)}</span>
+                        </li>`;
+                });
+            } else {
+                container.innerHTML = '<li class="p-3 text-center text-muted">Aucun mouvement</li>';
+                badge.style.display = 'none';
+            }
+        });
+    }
+
+    // Fonction de suppression sécurisée
+    window.clearAllNotifs = () => {
+        const code = prompt("Entrez le code Admin pour supprimer l'historique :");
+        if(code === "1234") { // Remplacez par votre code secret
+            remove(ref(db, 'notifications'));
+            alert("Historique vidé !");
+        } else {
+            alert("Code incorrect !");
+        }
+    };
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="google-sheets-sync.js"></script>
+
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(registration => {
+                    console.log('Service Worker enregistré avec succès:', registration.scope);
+                })
+                .catch(error => {
+                    console.error('L\'enregistrement du Service Worker a échoué:', error);
+                });
+        });
+    }
+</script>
+
+<button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
+    <i class="bi bi-power fs-4"></i>
+</button>
+
+<script>
+    function logout() {
+        if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
+            localStorage.removeItem('BONE_USER_SESSION');
+            window.location.href = 'login.html';
+        }
+    }
+</script>
+
 </body>
 </html>

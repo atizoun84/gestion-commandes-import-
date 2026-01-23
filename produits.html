@@ -107,7 +107,7 @@
         .stock-badge { font-size: 0.8rem; font-weight: bold; padding: 4px 12px; border-radius: 10px; margin-top: 5px; display: inline-block; }
 
         /* Style spécifique Order Modal */
-        .order-modal-header { background: var(--canva-gradient); color: white; border-radius: 30px 30px 0 0; padding: 20px; }
+        .order-modal-header { background: var(--canva-gradient); color: white; border-radius: 30px 30px 0 0; padding: 20px; position: relative; }
         .order-summary-table { font-size: 0.85rem; border-radius: 15px; overflow: hidden; }
         .order-summary-table th { background: #f8f9fa; color: #555; }
         .order-status-banner { border-radius: 15px; padding: 15px; font-weight: bold; text-align: center; margin-top: 15px; }
@@ -247,6 +247,7 @@
         <div class="modal-content shadow-lg border-0">
             <div class="order-modal-header text-center">
                 <h5 class="fw-bold mb-0 text-uppercase letter-spacing-1">Validation du Projet de Commande</h5>
+                <button type="button" class="btn-close btn-close-white position-absolute end-0 top-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4">
                 <div class="row g-4">
@@ -292,6 +293,7 @@
                                 <div class="col-6">
                                     <label class="form-label small fw-bold">QUANTITÉ</label>
                                     <input type="number" id="orderQty" class="form-control rounded-pill" value="1" min="1" oninput="Shop.calculateOrder()">
+                                    <div id="orderMinQtyHint" class="text-danger fw-bold mt-1" style="font-size: 0.7rem; display: none;"></div>
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small fw-bold">PRIX UNITAIRE FINAL</label>
@@ -359,9 +361,15 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Prix d'Achat Brut (Capital unité)</label>
-                        <input type="number" id="pPriceBuy" class="form-control rounded-pill bg-light" placeholder="Ex: 5000" required>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                             <label class="form-label small fw-bold text-primary">QUANTITÉ MINIMUM COMMANDE</label>
+                             <input type="number" id="pMinQty" class="form-control rounded-pill" placeholder="Ex: 1" value="1" min="1">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Prix d'Achat Brut (Capital unité)</label>
+                            <input type="number" id="pPriceBuy" class="form-control rounded-pill bg-light" placeholder="Ex: 5000" required>
+                        </div>
                     </div>
 
                     <div class="row g-2 mb-3">
@@ -438,6 +446,7 @@
                     <div class="marketing-banner">TARIFICATION PAR CANAL</div>
                     <img id="modalImg" src="" class="modal-product-img">
                     <h3 id="modalTitle" class="fw-bold text-dark mb-1"></h3>
+                    <div id="modalWaveNumber" class="badge bg-dark text-white mb-1" style="font-size: 0.7rem; display: none;"></div>
                     <div id="modalQualities" class="product-qualities px-4"></div>
                     <div id="modalUniqueIdDisplay" class="fw-bold text-primary mb-1" style="font-size: 1.1rem; letter-spacing: 1px;"></div>
                     <div id="modalStockDisplay" class="mb-2"></div>
@@ -468,7 +477,88 @@
     </div>
 </div>
 
+<script type="module">
+    // --- INTEGRATION FIREBASE ---
+    import { db, ref, onValue, set, notifyAdmin } from './firebase-config.js';
+    const PRODS_REF = ref(db, 'catalogue');
+
+    // Charger les produits en temps réel
+    onValue(PRODS_REF, (snapshot) => {
+        const productsFromFirebase = snapshot.val() || [];
+        products = productsFromFirebase; // Mise à jour de la variable globale locale
+        Shop.render(); // Rafraîchir l'affichage
+        if(Shop.isAdmin) Shop.renderAdminTable();
+    });
+
+    // Redéfinition de la sauvegarde pour inclure Firebase
+    const originalSave = Shop.saveProduct;
+    Shop.saveProduct = function(e) {
+        if(e) e.preventDefault();
+        
+        // 1. Logique originale de collecte de données
+        const editId = document.getElementById('editProductId').value;
+        const pOld = editId ? products.find(x => x.id == editId) : null;
+
+        const pData = {
+            id: editId ? parseInt(editId) : Date.now(),
+            uniqueId: editId ? pOld.uniqueId : "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase(),
+            currentWave: editId ? (pOld.currentWave || 1) : 1,
+            name: document.getElementById('pName').value,
+            priceBuy: parseFloat(document.getElementById('pPriceBuy').value) || 0,
+            cat: document.getElementById('pCat').value,
+            qualities: document.getElementById('pQualities').value,
+            stock: parseInt(document.getElementById('pStock').value) || 0,
+            minQty: parseInt(document.getElementById('pMinQty').value) || 1,
+            currency: document.getElementById('pCurrency').value,
+            origin: document.getElementById('pOrigin').value,
+            img: document.getElementById('pImgBase64').value || "https://via.placeholder.com/150",
+            canaux: {
+                avion: { vente: parseInt(document.getElementById('pAvionVente').value) || 0, transit: parseInt(document.getElementById('pAvionTransit').value) || 0, douane: parseInt(document.getElementById('pAvionDouane').value) || 0, liv: parseInt(document.getElementById('pAvionLiv').value) || 0 },
+                bateau: { vente: parseInt(document.getElementById('pBateauVente').value) || 0, transit: parseInt(document.getElementById('pBateauTransit').value) || 0, douane: parseInt(document.getElementById('pBateauDouane').value) || 0, liv: parseInt(document.getElementById('pBateauLiv').value) || 0 },
+                direct: { ttc: parseInt(document.getElementById('pDirectTTC').value) || 0, grosTTC: parseInt(document.getElementById('pGrosTTC').value) || 0, grosQty: parseInt(document.getElementById('pGrosQty').value) || 0 }
+            }
+        };
+
+        if(editId) { 
+            const idx = products.findIndex(x => x.id == editId); 
+            products[idx] = pData; 
+        } else { 
+            products.push(pData); 
+        }
+
+        // 2. SAUVEGARDE SUR FIREBASE (La modification demandée)
+        set(PRODS_REF, products); 
+        localStorage.setItem(DB_KEY, JSON.stringify(products)); // Backup local
+        
+        notifyAdmin('MISE À JOUR CATALOGUE', { item: pData.name + (editId ? " (Modifié)" : " (Nouveau)") });
+        
+        bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
+        Shop.init();
+    };
+</script>
+
 <script>
+    // --- Initialisation de la session et restrictions ---
+    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+    if (!session) window.location.href = 'login.html';
+
+    function appliquerRestrictions() {
+        if (session.role === 'user') {
+            const addBtn = document.querySelector('[data-bs-target="#addProductModal"], #addProductBtn, #btnFloatAdd');
+            if (addBtn) addBtn.style.display = 'none';
+
+            const actionButtons = document.querySelectorAll('.bi-pencil, .bi-pencil-square, .bi-trash, .bi-trash3, .btn-outline-danger, .btn-outline-primary, .btn-edit-prod');
+            actionButtons.forEach(btn => {
+                if (!btn.classList.contains('bi-cart-plus')) {
+                    btn.parentElement.style.display = 'none'; 
+                }
+            });
+
+            const adminLinks = document.querySelectorAll('a[href="comptabilite.html"], a[href="configuration.html"], a[href="maintenance.html"]');
+            adminLinks.forEach(link => link.style.display = 'none');
+        }
+    }
+
     const STORAGE_KEY = 'BONE_OFFICIAL_CONFIG_V2';
     const DB_KEY = 'BONE_PRODUCTS_LIST';
     const CAT_KEY = 'BONE_CATEGORIES_LIST';
@@ -492,23 +582,22 @@
             this.renderOrigins();
             this.render();
             this.loadBrandConfig();
+            appliquerRestrictions();
         },
 
         checkSession() {
-            const session = JSON.parse(localStorage.getItem(SESSION_KEY));
-            if (!session) {
+            const sessionData = JSON.parse(localStorage.getItem(SESSION_KEY));
+            if (!sessionData) {
                 window.location.href = 'login.html';
                 return;
             }
-            this.isAdmin = (session.role === 'admin');
+            this.isAdmin = (sessionData.role === 'admin');
             
-            // Affichage/Masquage des éléments selon le rôle
             const adminElements = document.querySelectorAll('.admin-only');
             adminElements.forEach(el => {
                 el.style.setProperty('display', this.isAdmin ? 'block' : 'none', 'important');
             });
 
-            // Masquage des éléments du menu pour les utilisateurs (Règle spécifique)
             if(!this.isAdmin) {
                 document.querySelector('.nav-home')?.style.setProperty('display', 'none', 'important');
                 document.querySelector('.nav-cart')?.style.setProperty('display', 'none', 'important');
@@ -579,6 +668,17 @@
             if(newOri && !origins.includes(newOri)) { origins.push(newOri); localStorage.setItem(ORIGIN_KEY, JSON.stringify(origins)); this.renderOrigins(); document.getElementById('pOrigin').value = newOri; }
         },
 
+        getRemainingMinQty(productId) {
+            const product = products.find(p => p.id === productId);
+            if (!product) return 0;
+            const wave = product.currentWave || 1;
+            const totalOrderedInWave = orders
+                .filter(o => o.prodId === productId && o.wave === wave)
+                .reduce((sum, o) => sum + (parseInt(o.qty) || 0), 0);
+            const remaining = (parseInt(product.minQty) || 1) - totalOrderedInWave;
+            return remaining > 0 ? remaining : 0;
+        },
+
         render(items = products) {
             const grid = document.getElementById('productGrid');
             grid.innerHTML = items.map(p => {
@@ -587,6 +687,12 @@
                     if(p.canaux.direct?.ttc) displayPrice = p.canaux.direct.ttc.toLocaleString();
                     else if(p.canaux.avion?.vente) displayPrice = (p.canaux.avion.vente + p.canaux.avion.transit + p.canaux.avion.douane + p.canaux.avion.liv).toLocaleString();
                 }
+
+                const wave = p.currentWave || 1;
+                const totalOrderedInWave = orders.filter(o => o.prodId === p.id && o.wave === wave).reduce((sum, o) => sum + (parseInt(o.qty) || 0), 0);
+                const minTarget = parseInt(p.minQty) || 1;
+                const ratioDisplay = minTarget > 1 ? `<div class="badge bg-light text-dark border mt-1" style="font-size:0.65rem;">Seuil: ${totalOrderedInWave}/${minTarget} (V${wave})</div>` : "";
+
                 return `
                 <div class="col-6 col-md-4 col-lg-3 mb-3" id="prod-card-${p.id}">
                     <div class="product-card shadow-sm p-3" onclick="Shop.showDetails(${p.id})">
@@ -594,6 +700,7 @@
                             <img src="${p.img}" class="product-img" loading="lazy">
                         </div>
                         <h3 class="h6 fw-bold text-dark mb-1 text-truncate">${p.name}</h3>
+                        <div class="mb-1">${ratioDisplay}</div>
                         <div class="d-flex justify-content-between align-items-center">
                             <span class="price-tag">${displayPrice} ${p.currency || 'F CFA'}</span>
                             <div class="d-flex gap-1">
@@ -604,6 +711,7 @@
                     </div>
                 </div>`;
             }).join('');
+            appliquerRestrictions();
         },
 
         openOrderModal(id) {
@@ -617,7 +725,21 @@
             document.getElementById('orderProdRef').innerText = "Réf: " + p.uniqueId;
             document.getElementById('orderProdStockBadge').innerHTML = p.stock > 0 ? 
                 `<span class="badge bg-success">En Stock (${p.stock})</span>` : 
-                `<span class="badge bg-warning text-dark">Sur Commande (A lancer)</span>`;
+                `<span class="badge bg-warning text-dark">Sur Commande (Vague ${p.currentWave || 1})</span>`;
+
+            const remaining = this.getRemainingMinQty(p.id);
+            const qtyInput = document.getElementById('orderQty');
+            const qtyHint = document.getElementById('orderMinQtyHint');
+            
+            qtyInput.value = 1; 
+            qtyInput.min = 1;
+            
+            if(remaining > 0 && p.minQty > 1) {
+                qtyHint.innerText = `Objectif : Encore ${remaining} unités pour lancer le lot (Vague ${p.currentWave || 1}).`;
+                qtyHint.style.display = "block";
+            } else {
+                qtyHint.style.display = "none";
+            }
 
             let priceRows = "";
             if(p.canaux) {
@@ -642,23 +764,11 @@
                         </td>
                     </tr>`;
                 }
-                if(p.canaux.direct?.grosTTC) {
-                    priceRows += `
-                    <tr class="order-price-row text-center bg-light">
-                        <td><small>📦 GROS</small></td>
-                        <td colspan="4" class="text-center"><small>Dès ${p.canaux.direct.grosQty || 1} unités</small></td>
-                        <td class="fw-bold d-flex align-items-center justify-content-center gap-2">
-                            ${p.canaux.direct.grosTTC.toLocaleString()}
-                            <input type="checkbox" class="form-check-input" onclick="Shop.togglePriceSelection(${p.canaux.direct.grosTTC}, this)">
-                        </td>
-                    </tr>`;
-                }
             }
             document.getElementById('orderPriceTable').innerHTML = priceRows || "<tr><td colspan='6' class='text-center'>Aucun tarif défini</td></tr>";
             
             document.getElementById('orderClientName').value = "";
             document.getElementById('orderClientPhone').value = "";
-            document.getElementById('orderQty').value = 1;
             document.getElementById('orderCustomPrice').value = "";
             document.getElementById('orderPayment').value = "";
             document.getElementById('orderStatusBanner').style.display = "none";
@@ -684,7 +794,6 @@
         autoSelectRow(spanEl) {
             const row = spanEl.closest('tr');
             const checkboxes = row.querySelectorAll('.form-check-input');
-            
             checkboxes.forEach(cb => {
                 if(!cb.checked) {
                     cb.checked = true;
@@ -695,7 +804,6 @@
                     if (val > 0) this.selectedPrices.push(val);
                 }
             });
-
             const totalSelected = this.selectedPrices.reduce((sum, val) => sum + val, 0);
             const qty = parseInt(document.getElementById('orderQty').value) || 1;
             document.getElementById('orderCustomPrice').value = totalSelected;
@@ -726,21 +834,23 @@
             const total = qty * price;
             document.getElementById('valTotal').innerText = total.toLocaleString() + " F CFA";
             const banner = document.getElementById('orderStatusBanner');
+            
             if(qty > 0 && price > 0) {
                 banner.style.display = "block";
                 const hasStock = (this.currentOrderProduct.stock >= qty);
                 const paymentOk = (payed >= total && total > 0);
+                
                 if(paymentOk) {
                     if(hasStock) {
                         banner.className = "order-status-banner bg-success-subtle text-success border border-success";
-                        banner.innerHTML = `<i class="bi bi-check-circle-fill"></i> COMMANDE VALIDÉE`;
+                        banner.innerHTML = `<i class="bi bi-check-circle-fill"></i> COMMANDE PRÊTE (STOCK DISPO)`;
                     } else {
                         banner.className = "order-status-banner bg-info-subtle text-primary border border-primary";
-                        banner.innerHTML = `<i class="bi bi-clock-history"></i> COMMANDE À LANCER (STOCK ÉPUISÉ)`;
+                        banner.innerHTML = `<i class="bi bi-clock-history"></i> PROJET ENREGISTRÉ (VAGUE ${this.currentOrderProduct.currentWave || 1})`;
                     }
                 } else {
                     banner.className = "order-status-banner bg-danger-subtle text-danger border border-danger";
-                    banner.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i> PAIEMENT INCOMPLET`;
+                    banner.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i> PAIEMENT INSUFFISANT`;
                 }
             } else {
                 banner.style.display = "none";
@@ -750,17 +860,15 @@
         validateProject() {
             const clientName = document.getElementById('orderClientName').value.trim();
             const clientPhone = document.getElementById('orderClientPhone').value.trim();
+            const qty = parseInt(document.getElementById('orderQty').value) || 0;
 
-            if(!clientName || !clientPhone) {
-                alert("Erreur : Le Nom et le Contact du client sont obligatoires.");
+            if(!clientName || !clientPhone || qty <= 0) {
+                alert("Erreur : Veuillez remplir tous les champs obligatoires.");
                 return;
             }
 
             const currentProduct = this.currentOrderProduct;
-            const isAvion = document.getElementById('row-avion') ? true : false;
-            const isBateau = document.getElementById('row-bateau') ? true : false;
-            const type = isAvion ? 'avion' : (isBateau ? 'bateau' : 'Direct');
-            
+            const wave = currentProduct.currentWave || 1;
             const now = new Date();
             const dateStr = now.toLocaleDateString('fr-FR');
             const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -770,20 +878,16 @@
                 timestamp: Date.now(),
                 prodId: currentProduct.id,
                 prodName: currentProduct.name,
+                wave: wave,
+                quantity: qty,
+                minOrderRequired: parseInt(currentProduct.minQty) || 1,
                 ref: currentProduct.uniqueId,
                 client: clientName,
                 phone: clientPhone,
-                price: currentProduct.canaux[type.toLowerCase()]?.vente || currentProduct.canaux.direct?.ttc || 0,
-                transit: currentProduct.canaux[type.toLowerCase()]?.transit || 0,
-                douane: currentProduct.canaux[type.toLowerCase()]?.douane || 0,
-                livraison: currentProduct.canaux[type.toLowerCase()]?.liv || 0,
-                isPricePayed: document.getElementById(`checkPrice${type}`)?.checked || document.getElementById('checkPriceDirect')?.checked || false,
-                isTransitPayed: document.getElementById(`checkTransit${type}`)?.checked || false,
-                isDouanePayed: document.getElementById(`checkDouane${type}`)?.checked || false,
-                isLivraisonPayed: document.getElementById(`checkLivraison${type}`)?.checked || false,
-                qty: parseInt(document.getElementById('orderQty').value) || 1,
-                total: (parseInt(document.getElementById('orderCustomPrice').value) || 0) * (parseInt(document.getElementById('orderQty').value) || 1),
-                status: (currentProduct.stock >= (parseInt(document.getElementById('orderQty').value) || 1)) ? "Validée" : "À Lancer",
+                price: parseInt(document.getElementById('orderCustomPrice').value) || 0,
+                qty: qty,
+                total: (parseInt(document.getElementById('orderCustomPrice').value) || 0) * qty,
+                status: (currentProduct.stock >= qty) ? "Validée" : "À Lancer",
                 date: `${dateStr} à ${timeStr}`
             };
 
@@ -792,24 +896,43 @@
 
             if(newOrder.status === "Validée") {
                 const idx = products.findIndex(x => x.id === currentProduct.id);
-                products[idx].stock -= newOrder.qty;
-                localStorage.setItem(DB_KEY, JSON.stringify(products));
+                if(idx !== -1) {
+                    products[idx].stock -= newOrder.qty;
+                    localStorage.setItem(DB_KEY, JSON.stringify(products));
+                }
             }
 
+            this.checkWaveThreshold(currentProduct.id);
             bootstrap.Modal.getInstance(document.getElementById('orderModal')).hide();
-            
             const overlay = document.getElementById('successOverlay');
             overlay.style.display = 'flex';
-            
-            setTimeout(() => {
-                window.location.href = "panier.html";
-            }, 2500);
+            setTimeout(() => { window.location.href = "panier.html"; }, 2000);
+        },
+
+        checkWaveThreshold(productId) {
+            const productIdx = products.findIndex(p => p.id === productId);
+            if (productIdx === -1) return;
+            const p = products[productIdx];
+            const currentWave = p.currentWave || 1;
+            const minQty = parseInt(p.minQty) || 1;
+
+            if (minQty > 1) {
+                const totalInWave = orders
+                    .filter(o => o.prodId === productId && o.wave === currentWave)
+                    .reduce((sum, o) => sum + (parseInt(o.qty) || 0), 0);
+
+                if (totalInWave >= minQty) {
+                    products[productIdx].currentWave = currentWave + 1;
+                    localStorage.setItem(DB_KEY, JSON.stringify(products));
+                }
+            }
         },
 
         openAddModal() {
             document.getElementById('editProductId').value = "";
             document.getElementById('addProductForm').reset();
             document.getElementById('pImgBase64').value = "";
+            document.getElementById('pMinQty').value = 1;
             new bootstrap.Modal(document.getElementById('addModal')).show();
         },
 
@@ -821,6 +944,7 @@
             document.getElementById('pCat').value = p.cat;
             document.getElementById('pQualities').value = p.qualities || "";
             document.getElementById('pStock').value = p.stock || "";
+            document.getElementById('pMinQty').value = p.minQty || 1;
             document.getElementById('pPriceBuy').value = p.priceBuy || ""; 
             document.getElementById('pCurrency').value = p.currency || "F CFA";
             document.getElementById('pOrigin').value = p.origin || "";
@@ -841,79 +965,28 @@
             new bootstrap.Modal(document.getElementById('addModal')).show();
         },
 
-        saveProduct(e) {
-            if(e) e.preventDefault();
-            const editId = document.getElementById('editProductId').value;
-            
-            const pData = {
-                id: editId ? parseInt(editId) : Date.now(),
-                uniqueId: editId ? products.find(x => x.id == editId).uniqueId : "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase(),
-                name: document.getElementById('pName').value,
-                priceBuy: parseFloat(document.getElementById('pPriceBuy').value) || 0,
-                cat: document.getElementById('pCat').value,
-                qualities: document.getElementById('pQualities').value,
-                stock: parseInt(document.getElementById('pStock').value) || 0,
-                currency: document.getElementById('pCurrency').value,
-                origin: document.getElementById('pOrigin').value,
-                img: document.getElementById('pImgBase64').value || "https://via.placeholder.com/150",
-                canaux: {
-                    avion: { 
-                        vente: parseInt(document.getElementById('pAvionVente').value) || 0, 
-                        transit: parseInt(document.getElementById('pAvionTransit').value) || 0, 
-                        douane: parseInt(document.getElementById('pAvionDouane').value) || 0, 
-                        liv: parseInt(document.getElementById('pAvionLiv').value) || 0 
-                    },
-                    bateau: { 
-                        vente: parseInt(document.getElementById('pBateauVente').value) || 0, 
-                        transit: parseInt(document.getElementById('pBateauTransit').value) || 0, 
-                        douane: parseInt(document.getElementById('pBateauDouane').value) || 0, 
-                        liv: parseInt(document.getElementById('pBateauLiv').value) || 0 
-                    },
-                    direct: { 
-                        ttc: parseInt(document.getElementById('pDirectTTC').value) || 0,
-                        grosTTC: parseInt(document.getElementById('pGrosTTC').value) || 0,
-                        grosQty: parseInt(document.getElementById('pGrosQty').value) || 0
-                    }
-                }
-            };
-            
-            if(editId) { 
-                const idx = products.findIndex(x => x.id == editId); 
-                products[idx] = pData; 
-            } else { 
-                products.push(pData); 
-            }
-            localStorage.setItem(DB_KEY, JSON.stringify(products));
-            const modalEl = document.getElementById('addModal');
-            const modalInstance = bootstrap.Modal.getInstance(modalEl);
-            if(modalInstance) modalInstance.hide();
-            this.checkSession();
-            this.render();
-            this.scrollToProduct(pData.id);
-        },
-
-        scrollToProduct(id) {
-            setTimeout(() => {
-                const el = document.getElementById(`prod-card-${id}`);
-                if(el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.classList.add('highlight-new'); setTimeout(() => el.classList.remove('highlight-new'), 3000); }
-            }, 300);
-        },
-
         showDetails(id) {
             const p = products.find(x => x.id === id);
             if(!p) return;
+            const wave = p.currentWave || 1;
             document.getElementById('currentProductId').value = p.id;
             document.getElementById('modalImg').src = p.img;
             document.getElementById('modalTitle').innerText = p.name;
             document.getElementById('modalQualities').innerText = p.qualities || "";
             document.getElementById('modalUniqueIdDisplay').innerText = p.uniqueId;
             document.getElementById('modalOrigin').innerText = "Origine : " + (p.origin || 'N/C');
+            
+            const waveBadge = document.getElementById('modalWaveNumber');
+            if(p.minQty > 1) { waveBadge.innerText = "VAGUE N°" + wave; waveBadge.style.display = "inline-block"; }
+            else { waveBadge.style.display = "none"; }
+
+            const totalInWave = orders.filter(o => o.prodId === p.id && o.wave === wave).reduce((sum, o) => sum + (parseInt(o.qty) || 0), 0);
+            const minTarget = parseInt(p.minQty) || 1;
+
             const stockDiv = document.getElementById('modalStockDisplay');
-            if(p.stock && p.stock > 0) {
-                stockDiv.innerHTML = `<span class="stock-badge bg-success text-white">📦 STOCK DISPONIBLE : ${p.stock}</span>`;
-            } else {
-                stockDiv.innerHTML = `<span class="stock-badge bg-warning text-dark">⏳ SUR COMMANDE</span>`;
-            }
+            if(p.stock && p.stock > 0) { stockDiv.innerHTML = `<span class="stock-badge bg-success text-white">📦 STOCK DISPONIBLE : ${p.stock}</span>`; }
+            else { stockDiv.innerHTML = `<span class="stock-badge bg-warning text-dark">⏳ SUR COMMANDE (${totalInWave}/${minTarget})</span>`; }
+
             let htmlPrices = "";
             const curr = p.currency || 'F CFA';
             if(p.canaux) {
@@ -926,170 +999,59 @@
                     const tot = (parseInt(c.bateau.vente)||0) + (parseInt(c.bateau.transit)||0) + (parseInt(c.bateau.douane)||0) + (parseInt(c.bateau.liv)||0);
                     htmlPrices += `<div class="mb-2 p-2 border rounded"><div class="d-flex justify-content-between fw-bold text-info"><span>🚢 BATEAU</span><span>${tot.toLocaleString()} ${curr}</span></div><div class="price-detail-box">Base: ${c.bateau.vente} | Transit: ${c.bateau.transit} | Douane: ${c.bateau.douane} | Liv: ${c.bateau.liv}</div></div>`;
                 }
-                if(c.direct?.ttc) {
-                    htmlPrices += `<div class="mb-2 p-2 border rounded bg-light"><div class="d-flex justify-content-between fw-bold text-success"><span>🏠 AU MAGASIN (Direct)</span><span>${c.direct.ttc.toLocaleString()} ${curr}</span></div></div>`;
-                }
-                if(c.direct?.grosTTC) {
-                    htmlPrices += `<div class="mb-2 p-2 border border-primary rounded" style="background: #f0f7ff;"><div class="d-flex justify-content-between fw-bold text-primary"><span>📦 PRIX DE GROS (x${c.direct.grosQty})</span><span>${parseInt(c.direct.grosTTC).toLocaleString()} ${curr}</span></div></div>`;
-                }
+                if(c.direct?.ttc) { htmlPrices += `<div class="mb-2 p-2 border rounded bg-light"><div class="d-flex justify-content-between fw-bold text-success"><span>🏠 AU MAGASIN (Direct)</span><span>${c.direct.ttc.toLocaleString()} ${curr}</span></div></div>`; }
             }
             document.getElementById('modalPriceList').innerHTML = htmlPrices || "<p class='text-muted'>Aucun prix configuré</p>";
             this.loadBrandConfig();
             new bootstrap.Modal(document.getElementById('productModal')).show();
+            appliquerRestrictions();
         },
 
         getPublishText() {
             const config = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-            const title = document.getElementById('modalTitle').innerText;
-            const ref = document.getElementById('modalUniqueIdDisplay').innerText;
-            const qualities = document.getElementById('modalQualities').innerText;
             const p = products.find(x => x.id == document.getElementById('currentProductId').value);
-            const stockTxt = (p && p.stock > 0) ? `✅ Stock : ${p.stock}` : `⏳ Sur commande`;
-            const company = config.companyName || "MT & B-One";
-            const ceo = config.ceoName || "L'Administrateur";
-            const phoneRaw = config.ceoWhatsapp || "";
-            const phoneForLink = phoneRaw.replace(/\s+/g, '').replace('+', '');
+            const wave = p.currentWave || 1;
+            const totalInWave = orders.filter(o => o.prodId === p.id && o.wave === wave).reduce((sum, o) => sum + (parseInt(o.qty) || 0), 0);
+            const minT = parseInt(p.minQty) || 1;
+            const stockTxt = (p && p.stock > 0) ? `✅ Stock : ${p.stock}` : `⏳ Sur commande (${totalInWave}/${minT} - Vague ${wave})`;
+            const phoneForLink = (config.ceoWhatsapp || "").replace(/\s+/g, '').replace('+', '');
             const curr = p.currency || 'F CFA';
             let priceTxt = "";
             if(p.canaux) {
-                if(p.canaux.avion?.vente) {
-                    const c = p.canaux.avion;
-                    const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0);
-                    priceTxt += `✈️ *AVION :* ${tot.toLocaleString()} ${curr}\n`;
-                    priceTxt += `   (Vente: ${c.vente} | Trans: ${c.transit} | Doua: ${c.douane} | Livr: ${c.liv})\n`;
-                }
-                if(p.canaux.bateau?.vente) {
-                    const c = p.canaux.bateau;
-                    const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0);
-                    priceTxt += `🚢 *BATEAU :* ${tot.toLocaleString()} ${curr}\n`;
-                    priceTxt += `   (Vente: ${c.vente} | Trans: ${c.transit} | Doua: ${c.douane} | Livr: ${c.liv})\n`;
-                }
-                if(p.canaux.direct?.ttc) {
-                    priceTxt += `🏠 *MAGASIN (Direct) :* ${p.canaux.direct.ttc.toLocaleString()} ${curr}\n`;
-                }
-                if(p.canaux.direct?.grosTTC) {
-                    priceTxt += `📦 *PRIX DE GROS :* ${parseInt(p.canaux.direct.grosTTC).toLocaleString()} ${curr} (dès ${p.canaux.direct.grosQty})\n`;
-                }
+                if(p.canaux.avion?.vente) { const c = p.canaux.avion; const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0); priceTxt += `✈️ *AVION :* ${tot.toLocaleString()} ${curr}\n`; }
+                if(p.canaux.bateau?.vente) { const c = p.canaux.bateau; const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0); priceTxt += `🚢 *BATEAU :* ${tot.toLocaleString()} ${curr}\n`; }
+                if(p.canaux.direct?.ttc) { priceTxt += `🏠 *MAGASIN :* ${p.canaux.direct.ttc.toLocaleString()} ${curr}\n`; }
             }
-            const productOrders = orders.filter(o => o.prodId == p.id);
-            let clientTxt = "";
-            if(productOrders.length > 0) {
-                clientTxt = `\n👥 *RÉSERVATIONS / CLIENTS :*\n`;
-                productOrders.forEach((o, i) => {
-                    clientTxt += `   ${i+1}. ${o.client} (Qté: ${o.qty})\n`;
-                });
-            }
-            
-            let momoTxt = "";
-            if(config.momoAccounts && config.momoAccounts.length > 0) {
-                momoTxt = `\n💳 *PAIEMENT MOBILE MONEY :*\n`;
-                config.momoAccounts.forEach(acc => {
-                    momoTxt += `   - ${acc.network} : ${acc.phone}\n`;
-                });
-            }
-
-            let associateTxt = "";
-            if(config.associates && config.associates.length > 0) {
-                associateTxt = `\n🤝 *CONTACTS ASSOCIÉS :*\n`;
-                config.associates.forEach(assoc => {
-                    const cleanPhone = assoc.phone.replace(/\s+/g, '').replace('+', '');
-                    if(cleanPhone) {
-                        associateTxt += `   - ${assoc.country} : https://wa.me/${cleanPhone}\n`;
-                    }
-                });
-            }
-            return `🌟 *DISPONIBILITÉ : ${company}*\n` +
-                        `━━━━━━━━━━━━━━━━━━\n\n` +
-                        `📦 *Produit :* ${title}\n` +
-                        `🔍 *Référence :* ${ref}\n` +
-                        `📊 *État :* ${stockTxt}\n` +
-                        `✨ *Qualités :* ${qualities || 'Qualité Premium'}\n\n` +
-                        `💰 *NOS TARIFS DÉTAILLÉS :*\n${priceTxt}` +
-                        `${momoTxt}` +
-                        `${clientTxt}\n` +
-                        `🚀 *Meilleurs prix garantis.*\n\n` +
-                        `📲 *Contact PDG :* https://wa.me/${phoneForLink}\n` +
-                        `${associateTxt}\n` +
-                        `✍️ _Signé : ${ceo}_`;
+            return `🌟 *DISPONIBILITÉ : ${config.companyName || "MT & B-One"}*\n━━━━━━━━━━━━━━━━━━\n\n📦 *Produit :* ${p.name}\n🔍 *Réf :* ${p.uniqueId}\n📊 *État :* ${stockTxt}\n✨ *Qualités :* ${p.qualities || 'Qualité Premium'}\n\n💰 *TARIFS :*\n${priceTxt}\n📲 *Contact PDG :* https://wa.me/${phoneForLink}\n✍️ _Signé : ${config.ceoName || "L'Administrateur"}_`;
         },
 
-        publishToStatus() {
-            const msg = this.getPublishText();
-            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-        },
+        publishToStatus() { window.open(`https://wa.me/?text=${encodeURIComponent(this.getPublishText())}`, '_blank'); },
 
         shareProductImg() {
-            const p = products.find(x => x.id == document.getElementById('currentProductId').value);
-            if(!p) return;
-            const btn = event.currentTarget;
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Génération...';
-            btn.disabled = true;
-            const textToCopy = this.getPublishText();
-            navigator.clipboard.writeText(textToCopy).catch(err => {
-                console.error('Erreur lors de la copie du texte: ', err);
-            });
             const area = document.getElementById('captureArea');
-            setTimeout(() => {
-                html2canvas(area, { useCORS: true, scale: 2 }).then(canvas => {
-                    const link = document.createElement('a');
-                    link.download = `Fiche_${p.name}.png`;
-                    link.href = canvas.toDataURL("image/png");
-                    link.click();
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                    alert("Affiche générée et texte de publication copié !");
-                });
-            }, 100);
+            html2canvas(area, { useCORS: true, scale: 2 }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `Fiche_Produit.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            });
         },
 
         shareProductLink() {
             const config = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-            const title = document.getElementById('modalTitle').innerText;
-            const ref = document.getElementById('modalUniqueIdDisplay').innerText;
-            const company = config.companyName || "MT & B-One";
-            const phoneRaw = config.ceoWhatsapp || "";
-            const phoneForLink = phoneRaw.replace(/\s+/g, '').replace('+', '');
-            const p = products.find(x => x.id == document.getElementById('currentProductId').value);
-            const curr = p.currency || 'F CFA';
-            
-            let priceLines = "";
-            if(p.canaux) {
-                if(p.canaux.direct?.ttc) {
-                    priceLines = `💰 *Prix indiqué :* ${p.canaux.direct.ttc.toLocaleString()} ${curr}`;
-                } else if(p.canaux.avion?.vente) {
-                    const c = p.canaux.avion;
-                    const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0);
-                    priceLines = `💰 *Prix vente :* ${c.vente.toLocaleString()} ${curr}\n` +
-                                 `🚢 *Transit :* ${c.transit.toLocaleString()} ${curr}\n` +
-                                 `🛃 *Douane :* ${c.douane.toLocaleString()} ${curr}\n` +
-                                 `🚚 *Livraison :* ${c.liv.toLocaleString()} ${curr}\n` +
-                                 `💵 *Total :* ${tot.toLocaleString()} ${curr}`;
-                }
-            }
-
-            let momoLines = "";
-            if(config.momoAccounts && config.momoAccounts.length > 0) {
-                momoLines = `\n\n💳 *Comptes de dépôt :*`;
-                config.momoAccounts.forEach(acc => {
-                    momoLines += `\n- ${acc.network} : ${acc.phone}`;
-                });
-            }
-
-            const msg = `*DEMANDE DE COMMANDE - ${company}*\n\n` +
-                        `Bonjour, je souhaiterais passer une commande pour le produit suivant :\n\n` +
-                        `📦 *Produit :* ${title}\n` +
-                        `🔍 *Référence :* ${ref}\n` +
-                        `${priceLines}` +
-                        `${momoLines}\n\n` +
-                        `Pourriez-vous m'indiquer la marche à suivre ? Merci d'avance.`;
+            const phoneForLink = (config.ceoWhatsapp || "").replace(/\s+/g, '').replace('+', '');
+            const msg = `*DEMANDE DE COMMANDE*\nJe souhaite commander : ${document.getElementById('modalTitle').innerText} (Ref: ${document.getElementById('modalUniqueIdDisplay').innerText})`;
             window.open(`https://wa.me/${phoneForLink}?text=${encodeURIComponent(msg)}`, '_blank');
         },
 
         deleteCurrentProduct() {
-            const id = parseInt(document.getElementById('currentProductId').value);
-            this.deleteProduct(id);
-            bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
+            if(confirm("Supprimer ?")) {
+                const id = parseInt(document.getElementById('currentProductId').value);
+                products = products.filter(p => p.id !== id);
+                localStorage.setItem(DB_KEY, JSON.stringify(products));
+                bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
+                this.init();
+            }
         },
 
         renderAdminTable() {
@@ -1097,7 +1059,7 @@
             tbody.innerHTML = products.map(p => `
                 <tr>
                     <td><code class="small">${p.uniqueId}</code></td>
-                    <td><b>${p.name}</b></td>
+                    <td><b>${p.name}</b> <small class="text-muted">(V${p.currentWave || 1})</small></td>
                     <td><span class="badge ${p.stock > 0 ? 'bg-success' : 'bg-secondary'}">${p.stock || 0}</span></td>
                     <td>${p.canaux?.avion?.vente ? '✈️' : ''} ${p.canaux?.bateau?.vente ? '🚢' : ''} ${p.canaux?.direct?.ttc ? '🏠' : ''}</td>
                     <td class="text-end">
@@ -1116,8 +1078,8 @@
             tbody.innerHTML = orders.map(o => `
                 <tr>
                     <td><small>${o.date}</small></td>
-                    <td><b>${o.client}</b><br><small>${o.phone}</small></td>
-                    <td>${o.prodName}<br><code class="small">${o.ref}</code> (x${o.qty})</td>
+                    <td><b>${o.client}</b></td>
+                    <td>${o.prodName} (x${o.qty}) <small class="text-muted">V${o.wave}</small></td>
                     <td class="fw-bold">${o.total.toLocaleString()}</td>
                     <td><span class="badge ${o.status === 'Validée' ? 'bg-success' : 'bg-info'}">${o.status}</span></td>
                     <td class="text-end">
@@ -1128,38 +1090,20 @@
         },
 
         deleteOrder(id) {
-            if(confirm("Supprimer cette commande de l'historique ?")) {
-                orders = orders.filter(o => o.id !== id);
-                localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
-                this.renderOrdersTable();
-            }
+            if(confirm("Supprimer ?")) { orders = orders.filter(o => o.id != id); localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); this.renderOrdersTable(); }
         },
 
         duplicateProduct(id) {
             const p = products.find(x => x.id === id);
-            if(!p) return;
             const clone = JSON.parse(JSON.stringify(p));
             clone.id = Date.now();
             clone.uniqueId = "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase();
-            clone.name += " (Copie)";
-            products.push(clone);
-            localStorage.setItem(DB_KEY, JSON.stringify(products));
-            this.init();
-            this.scrollToProduct(clone.id);
+            clone.name += " (Copie)"; clone.currentWave = 1;
+            products.push(clone); localStorage.setItem(DB_KEY, JSON.stringify(products)); this.init();
         },
 
-        // LOGIQUE DE SUPPRESSION MISE À JOUR
         deleteProduct(id) {
-            if(confirm("Supprimer ce produit définitivement ?")) {
-                products = products.filter(p => p.id !== id);
-                localStorage.setItem(DB_KEY, JSON.stringify(products));
-                this.init();
-                
-                // Suppression Cloud si disponible
-                if(window.SyncManager) {
-                    window.SyncManager.deleteItem(DB_KEY, id);
-                }
-            }
+            if(confirm("Supprimer ?")) { products = products.filter(p => p.id !== id); localStorage.setItem(DB_KEY, JSON.stringify(products)); this.init(); }
         },
 
         search() { const q = document.getElementById('searchInput').value.toLowerCase(); this.render(products.filter(p => p.name.toLowerCase().includes(q))); },
@@ -1175,72 +1119,31 @@
         const file = e.target.files[0];
         if(!file) return;
         const reader = new FileReader();
-        reader.onload = function(event) { 
-            document.getElementById('pImgBase64').value = event.target.result; 
-        };
+        reader.onload = function(event) { document.getElementById('pImgBase64').value = event.target.result; };
         reader.readAsDataURL(file);
     };
 
-    document.getElementById('addProductForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        Shop.saveProduct();
-    });
-
-    window.onload = () => {
-        Shop.init();
+    document.getElementById('addProductForm').onsubmit = function(e) {
+        Shop.saveProduct(e);
     };
 
-    // LOGIQUE PWA : Service Worker & Manifest
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            const swCode = `
-                const CACHE_NAME = 'mt-bone-v1';
-                const urlsToCache = [
-                    '/',
-                    '/index.html',
-                    '/produits.html',
-                    '/panier.html',
-                    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
-                    'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css'
-                ];
-
-                self.addEventListener('install', event => {
-                    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache)));
-                });
-
-                self.addEventListener('fetch', event => {
-                    event.respondWith(
-                        caches.match(event.request).then(response => response || fetch(event.request))
-                    );
-                });
-            `;
-            const blob = new Blob([swCode], {type: 'text/javascript'});
-            const swUrl = URL.createObjectURL(blob);
-            navigator.serviceWorker.register(swUrl).catch(err => console.log('SW error:', err));
-        });
-    }
-
-    // Création dynamique du Manifest
-    const manifest = {
-        "name": "MT & B-One Catalogue",
-        "short_name": "MT & B-One",
-        "start_url": "index.html",
-        "display": "standalone",
-        "background_color": "#ffffff",
-        "theme_color": "#7d2ae8",
-        "icons": [
-            { "src": "https://via.placeholder.com/192", "sizes": "192x192", "type": "image/png" },
-            { "src": "https://via.placeholder.com/512", "sizes": "512x512", "type": "image/png" }
-        ]
-    };
-    const stringManifest = JSON.stringify(manifest);
-    const blob = new Blob([stringManifest], {type: 'application/json'});
-    const manifestURL = URL.createObjectURL(blob);
-    document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${manifestURL}">`);
-
+    window.onload = () => { Shop.init(); };
 </script>
 
-<script src="google-sheets-sync.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
+    <i class="bi bi-power fs-4"></i>
+</button>
+
+<script>
+    function logout() {
+        if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
+            localStorage.removeItem('BONE_USER_SESSION');
+            window.location.href = 'login.html';
+        }
+    }
+</script>
+
 </body>
 </html>

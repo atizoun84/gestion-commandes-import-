@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MT & B-One | Mon Panier & Commandes</title>
     
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#7d2ae8">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="B-One Cart">
-    
-    <meta name="theme-color" content="#7d2ae8">
+    <meta name="apple-mobile-web-app-title" content="B-One Panier">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     
     <style>
         :root { 
@@ -41,8 +41,8 @@
         .table-orders td { vertical-align: middle; padding: 15px; font-size: 0.9rem; border-color: #f1f1f1; }
         
         .status-badge { padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; }
-        .status-finalise { background: #e6fcf5; color: #0ca678; } /* Vert */
-        .status-incomplet { background: #fff5f5; color: #fa5252; } /* Rouge */
+        .status-validee { background: #e6fcf5; color: #0ca678; }
+        .status-lancer { background: #fff4e6; color: #f76707; }
 
         /* Style détails financiers en colonnes */
         .payment-detail-box { text-align: center; line-height: 1.2; min-width: 60px; }
@@ -59,42 +59,33 @@
 
         footer { background: white; border-top: 1px solid #eee; padding: 20px 0; margin-top: 50px; font-size: 0.8rem; color: #888; }
 
-        /* Modal Recap & Finalize Style */
-        .recap-modal-content, .finalize-modal-content, .invoice-modal-content { border-radius: 30px; border: none; overflow: hidden; }
-        .recap-header, .finalize-header, .invoice-header { background: var(--canva-gradient); color: white; padding: 25px; text-align: center; position: relative; }
-        .recap-body, .finalize-body, .invoice-body { padding: 30px; }
+        /* Modal Recap Style */
+        .recap-modal-content { border-radius: 30px; border: none; overflow: hidden; }
+        .recap-header { background: var(--canva-gradient); color: white; padding: 25px; text-align: center; position: relative; }
+        .recap-body { padding: 30px; }
         .recap-preview { background: #f8f9fa; border-radius: 15px; padding: 20px; font-family: monospace; white-space: pre-wrap; font-size: 0.85rem; border: 1px dashed #ccc; }
         
-        /* Invoice Professional Styling */
-        .invoice-paper { background: white; padding: 40px; border: 1px solid #eee; border-radius: 15px; color: #333; }
-        .invoice-table { width: 100%; margin-top: 20px; border-top: 2px solid var(--canva-purple); }
-        .invoice-table th { padding: 12px; background: #f8f9fa; color: var(--canva-purple); border-bottom: 1px solid #eee; text-transform: uppercase; font-size: 0.75rem; }
-        .invoice-table td { padding: 15px 12px; border-bottom: 1px solid #f1f1f1; font-size: 0.9rem; }
-        .invoice-total-row { background: #fdfbff; font-weight: bold; }
-        .invoice-logo { height: 60px; width: 60px; object-fit: contain; margin-bottom: 10px; }
-
-        /* Success Overlay */
-        #successOverlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(125, 42, 232, 0.95);
-            display: none; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 9999; color: white;
-        }
-
+        /* Nouveau Print Area Style */
         #printArea { display: none; }
+
+        /* Style pour les notifications */
+        .text-purple { color: var(--canva-purple) !important; }
 
         @media print {
             body * { visibility: hidden; }
             #printArea, #printArea * { visibility: visible; }
             #printArea { 
                 display: block !important; 
-                position: absolute; left: 0; top: 0; width: 100%; 
-                padding: 40px !important;
-                background: white !important;
+                position: absolute; 
+                left: 0; 
+                top: 0; 
+                width: 100%; 
+                font-size: 10pt !important;
                 color: black !important;
             }
-            .invoice-table { border-collapse: collapse !important; width: 100% !important; }
-            .invoice-table th, .invoice-table td { border: 1px solid #eee !important; font-size: 10pt !important; }
+            .table-orders { width: 100%; border-collapse: collapse; }
+            .table-orders th, .table-orders td { border: 1px solid #ddd !important; padding: 8px !important; }
+            .payment-detail-box { display: inline-block; width: 19%; border-right: 1px solid #eee; }
             .no-print { display: none !important; }
         }
     </style>
@@ -111,9 +102,26 @@
                     <small class="opacity-75" style="font-size: 0.65rem;">Suivi des Commandes</small>
                 </div>
             </div>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
-                <i class="bi bi-list fs-2"></i>
-            </button>
+
+            <div class="ms-auto d-flex align-items-center">
+                <div class="position-relative d-inline-block me-3" id="adminNotifGroup" style="display:none !important;">
+                    <button class="btn btn-light rounded-circle shadow-sm" data-bs-toggle="dropdown">
+                        <i class="bi bi-bell-fill text-purple"></i>
+                        <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" id="notifList" style="width: 300px; max-height: 400px; overflow-y: auto;">
+                        <li class="dropdown-header">Derniers mouvements</li>
+                        <div id="notifItems"></div>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button onclick="clearAllNotifs()" class="dropdown-item text-center text-danger fw-bold">Supprimer l'historique (Code requis)</button></li>
+                    </ul>
+                </div>
+
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                    <i class="bi bi-list fs-2"></i>
+                </button>
+            </div>
+
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
                     <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
@@ -130,14 +138,9 @@
 </header>
 
 <main class="container cart-container mb-5 no-print">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="h4 fw-bold mb-0"><i class="bi bi-bag-check-fill text-primary me-2"></i>Récapitulatif des Commandes</h2>
-        <div class="d-flex gap-2 flex-wrap">
-            <select id="statusFilter" class="form-select rounded-pill px-3" style="width: auto;" onchange="CartManager.renderOrders()">
-                <option value="all">Tous les statuts</option>
-                <option value="finalised">Finalisées</option>
-                <option value="incomplete">Incomplètes</option>
-            </select>
+        <div class="d-flex gap-2">
             <button class="btn btn-dark rounded-pill px-3" onclick="CartManager.copyAllOrdersRecap()">
                 <i class="bi bi-clipboard-data me-1"></i> Copier Tout (WA)
             </button>
@@ -158,9 +161,9 @@
                         <thead>
                             <tr>
                                 <th>Produit & Client</th>
-                                <th class="text-center">Référence</th>
+                                <th class="text-center">Qté</th>
                                 <th class="text-center">Détails Prix (U)</th>
-                                <th class="text-center">Règlement</th>
+                                <th class="text-center">Règlement Global</th>
                                 <th class="text-center">Statut</th>
                                 <th class="text-end">Actions</th>
                             </tr>
@@ -179,20 +182,12 @@
             <div class="summary-box shadow-lg">
                 <h5 class="fw-bold mb-4">Résumé Financier</h5>
                 <div class="summary-item">
-                    <span>Commandes Finalisées</span>
+                    <span>Commandes Validées</span>
                     <span id="totalValidated">0 F CFA</span>
                 </div>
                 <div class="summary-item">
-                    <span>Commandes Incomplètes</span>
+                    <span>Produit à commander</span>
                     <span id="totalPending">0 F CFA</span>
-                </div>
-                <div class="summary-item ps-3 border-start" style="font-size: 0.8rem; opacity: 0.8;">
-                    <span>- Déjà Payé</span>
-                    <span id="pendingPayed">0 F CFA</span>
-                </div>
-                <div class="summary-item ps-3 border-start" style="font-size: 0.8rem; opacity: 0.8;">
-                    <span>- Reste à percevoir</span>
-                    <span id="pendingRemaining">0 F CFA</span>
                 </div>
                 <div class="summary-total">
                     <span>TOTAL GÉNÉRAL</span>
@@ -208,95 +203,18 @@
     </div>
 </main>
 
-<div class="modal fade" id="finalizeModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="finalize-modal-content modal-content">
-            <div class="finalize-header">
-                <h5 class="fw-bold mb-0">Finaliser le Règlement</h5>
-                <p class="small mb-0" id="finalizeClientName">Client</p>
-            </div>
-            <div class="finalize-body">
-                <div id="finalizeCheckboxes" class="d-flex flex-column gap-3 mb-4"></div>
-                <div class="d-grid">
-                    <button class="btn btn-primary py-3 rounded-pill fw-bold" onclick="CartManager.submitFinalization()">
-                        ENREGISTRER LE RÈGLEMENT
-                    </button>
-                </div>
-            </div>
-        </div>
+<div id="printArea">
+    <div style="text-align: center; border-bottom: 2px solid #000; margin-bottom: 20px; padding-bottom: 10px;">
+        <h2 id="printTitle" style="margin: 0;"></h2>
+        <p id="printSubtitle" style="margin: 5px 0;"></p>
+        <p>Date du rapport : <span id="printDateActual"></span></p>
     </div>
-</div>
-
-<div class="modal fade" id="invoiceModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="invoice-modal-content modal-content">
-            <div class="invoice-header">
-                <h5 class="fw-bold mb-0"><i class="bi bi-file-earmark-pdf me-2"></i>Facture Officielle</h5>
-                <button type="button" class="btn-close btn-close-white position-absolute end-0 top-0 m-3" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="invoice-body bg-light">
-                <div class="invoice-paper shadow-sm mb-4" id="invoicePaperToPrint">
-                    <div class="d-flex justify-content-between align-items-start border-bottom pb-4 mb-4">
-                        <div class="d-flex align-items-center gap-3">
-                            <img id="inv_logo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="invoice-logo" alt="Logo">
-                            <div>
-                                <h3 class="fw-bold text-primary mb-1" id="inv_corpName">ENTREPRISE</h3>
-                                <p class="small text-muted mb-0" id="inv_corpContact">Email & Téléphone</p>
-                            </div>
-                        </div>
-                        <div class="text-end">
-                            <h4 class="fw-bold mb-0">FACTURE</h4>
-                            <p class="small text-muted mb-0">N° : <span id="inv_ref">---</span></p>
-                            <p class="small text-muted mb-0">Date : <span id="inv_date">---</span></p>
-                        </div>
-                    </div>
-                    <div class="mb-4">
-                        <p class="small text-muted text-uppercase fw-bold mb-1">Facturé à :</p>
-                        <h5 class="fw-bold mb-0" id="inv_clientName">NOM DU CLIENT</h5>
-                    </div>
-                    <table class="invoice-table">
-                        <thead>
-                            <tr>
-                                <th>Description / Poste</th>
-                                <th class="text-center">Détails</th>
-                                <th class="text-center">Statut</th>
-                                <th class="text-end">Montant (F CFA)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="invoiceTableBody"></tbody>
-                    </table>
-                    <div class="mt-5 pt-4 d-flex justify-content-between align-items-end">
-                        <div class="small">
-                            <p class="mb-0"><strong>Conditions :</strong> Règlement par tranche accepté.</p>
-                            <p class="mb-0">Merci pour votre confiance !</p>
-                        </div>
-                        <div class="text-center" style="min-width: 150px;">
-                            <p class="mb-4 fw-bold small text-uppercase">Signature du PDG</p>
-                            <p class="mb-0" id="inv_ceoSign" style="font-family: 'Brush Script MT', cursive; font-size: 1.5rem; border-top: 1px solid #ddd; padding-top: 10px;"></p>
-                        </div>
-                    </div>
-                </div>
-                <div class="row g-2">
-                    <div class="col-md-6">
-                        <button class="btn btn-success w-100 py-3 rounded-pill fw-bold" onclick="CartManager.copyInvoiceWA()">
-                            <i class="bi bi-whatsapp me-2"></i> COPIER POUR WHATSAPP
-                        </button>
-                    </div>
-                    <div class="col-md-6">
-                        <button class="btn btn-primary w-100 py-3 rounded-pill fw-bold" onclick="CartManager.printProfessionalInvoice()">
-                            <i class="bi bi-printer me-2"></i> IMPRIMER LA FACTURE
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div id="printContent"></div>
+    <div style="margin-top: 40px; text-align: right;">
+        <p><b>Signature et Cachet</b></p>
+        <br><br>
+        <p id="printCeoSign"></p>
     </div>
-</div>
-
-<div id="successOverlay" class="animate__animated">
-    <i class="bi bi-check-circle-fill animate__animated animate__bounceIn" style="font-size: 5rem;"></i>
-    <h2 class="fw-bold mt-3 animate__animated animate__fadeInUp">PAIEMENT RÉUSSI !</h2>
-    <p class="animate__animated animate__fadeInUp">La commande est désormais à jour.</p>
 </div>
 
 <div class="modal fade" id="recapModal" tabindex="-1" aria-hidden="true">
@@ -305,30 +223,39 @@
             <div class="recap-header">
                 <h5 class="fw-bold mb-0"><i class="bi bi-collection me-2"></i>Point de Vente Détaillé</h5>
                 <small>Décomposition des paiements et restes par poste</small>
-                <button type="button" class="btn-close btn-close-white position-absolute end-0 top-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white position-absolute end-0 top-0 m-3" data-bs-toggle="modal" aria-label="Close"></button>
             </div>
             <div class="recap-body">
-                <div class="mb-4">
-                    <label class="form-label small fw-bold text-muted">SÉLECTIONNER UN PRODUIT</label>
-                    <select id="recapSelect" class="form-select rounded-pill shadow-sm" onchange="CartManager.updateRecapPreview()">
-                        <option value="">-- Choisir un produit pour voir le point --</option>
-                    </select>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-8">
+                        <label class="form-label small fw-bold text-muted">SÉLECTIONNER UN PRODUIT</label>
+                        <select id="recapSelect" class="form-select rounded-pill shadow-sm" onchange="CartManager.updateWaveOptions()">
+                            <option value="">-- Choisir un produit --</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">VAGUE</label>
+                        <select id="recapWaveSelect" class="form-select rounded-pill shadow-sm" onchange="CartManager.updateRecapPreview()">
+                            <option value="">-- Vague --</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="mb-4">
                     <label class="form-label small fw-bold text-muted">APERÇU DU MESSAGE WHATSAPP</label>
-                    <div id="recapPreview" class="recap-preview text-muted">Sélectionnez un produit...</div>
+                    <div id="recapPreview" class="recap-preview text-muted">Sélectionnez un produit et une vague...</div>
                 </div>
                 <div class="d-grid gap-2">
                     <button class="btn btn-success py-3 rounded-pill fw-bold shadow" onclick="CartManager.copyAndCloseRecap()">
                         <i class="bi bi-clipboard-check me-2"></i> COPIER LE POINT
+                    </button>
+                    <button class="btn btn-outline-secondary py-3 rounded-pill fw-bold" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i> FERMER
                     </button>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-<div id="printArea"></div>
 
 <footer class="text-center no-print">
     <div class="container">
@@ -337,15 +264,55 @@
     </div>
 </footer>
 
-<script>
-    // Logique PWA : Enregistrement du Service Worker
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('PWA: Service Worker enregistré !'))
-                .catch(err => console.error('PWA: Erreur Service Worker', err));
+<script type="module">
+    import { db, ref, onValue, remove } from './firebase-config.js';
+    
+    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+    if(session && session.role === 'admin') {
+        document.getElementById('adminNotifGroup').style.setProperty('display', 'inline-block', 'important');
+        
+        onValue(ref(db, 'notifications'), (snapshot) => {
+            const data = snapshot.val();
+            const badge = document.getElementById('notifBadge');
+            const container = document.getElementById('notifItems');
+            container.innerHTML = '';
+            
+            if(data) {
+                const list = Object.entries(data).reverse();
+                const unreadCount = list.filter(n => !n[1].read).length;
+                
+                badge.innerText = unreadCount;
+                badge.style.display = unreadCount > 0 ? 'block' : 'none';
+
+                list.forEach(([id, notif]) => {
+                    container.innerHTML += `
+                        <li class="p-2 border-bottom">
+                            <small class="text-muted">${new Date(notif.timestamp).toLocaleString()}</small><br>
+                            <strong>${notif.user}</strong>: ${notif.type}<br>
+                            <span class="text-secondary small">${JSON.stringify(notif.details)}</span>
+                        </li>`;
+                });
+            } else {
+                container.innerHTML = '<li class="p-3 text-center text-muted">Aucun mouvement</li>';
+                badge.style.display = 'none';
+            }
         });
     }
+
+    window.clearAllNotifs = () => {
+        const code = prompt("Entrez le code Admin pour supprimer l'historique :");
+        if(code === "1234") {
+            remove(ref(db, 'notifications'));
+            alert("Historique vidé !");
+        } else {
+            alert("Code incorrect !");
+        }
+    };
+</script>
+
+<script type="module">
+    // --- INTEGRATION FIREBASE ---
+    import { db, ref, push, notifyAdmin } from './firebase-config.js';
 
     const ORDERS_KEY = 'BONE_ORDERS_HISTORY';
     const DB_KEY = 'BONE_PRODUCTS_LIST';
@@ -354,8 +321,6 @@
     const CartManager = {
         orders: [],
         products: [],
-        currentFinalizingId: null,
-        currentInvoiceOrder: null,
 
         init() {
             this.loadConfig();
@@ -366,23 +331,18 @@
         loadConfig() {
             const config = JSON.parse(localStorage.getItem(CONFIG_KEY));
             if(config) {
-                if(config.logo) {
-                    document.getElementById('navLogo').src = config.logo;
-                    document.getElementById('inv_logo').src = config.logo;
-                }
+                if(config.logo) document.getElementById('navLogo').src = config.logo;
                 if(config.companyName) {
                     document.getElementById('navCompanyName').innerText = config.companyName;
                     document.getElementById('footerCompanyName').innerText = config.companyName;
-                    document.getElementById('inv_corpName').innerText = config.companyName;
+                    document.getElementById('printTitle').innerText = config.companyName;
                 }
                 if(config.ceoName) {
-                    document.getElementById('inv_ceoSign').innerText = config.ceoName;
+                    document.getElementById('printCeoSign').innerText = config.ceoName;
                 }
-                const contacts = [];
-                if(config.email) contacts.push(config.email);
-                if(config.phone) contacts.push(config.phone);
-                document.getElementById('inv_corpContact').innerText = contacts.join(' | ');
             }
+            document.getElementById('printSubtitle').innerText = "Rapport de Ventes & Commandes";
+            document.getElementById('printDateActual').innerText = new Date().toLocaleDateString('fr-FR');
         },
 
         renderOrders() {
@@ -390,65 +350,48 @@
             const tbody = document.getElementById('cartTableBody');
             const emptyMsg = document.getElementById('emptyMessage');
             const select = document.getElementById('recapSelect');
-            const statusFilter = document.getElementById('statusFilter').value;
             
             if (!this.orders || this.orders.length === 0) {
                 tbody.innerHTML = "";
                 emptyMsg.style.display = "block";
-                this.updateSummary(0, 0, 0, 0);
+                this.updateSummary(0, 0);
                 return;
             }
 
             emptyMsg.style.display = "none";
-            let totalVal = 0, totalPen = 0, penPayed = 0, penRem = 0;
+            let totalVal = 0, totalPen = 0;
             
             const uniqueProducts = [...new Set(this.orders.map(o => o.prodName))];
-            select.innerHTML = '<option value="">-- Choisir un produit pour voir le point --</option>' + 
+            select.innerHTML = '<option value="">-- Choisir un produit --</option>' + 
                 uniqueProducts.map(name => `<option value="${name}">${name}</option>`).join('');
 
-            const displayOrders = this.orders.filter(order => {
-                const vBase = parseFloat(order.price) || 0;
-                const tPrice = parseFloat(order.transit) || 0;
-                const dPrice = parseFloat(order.douane) || 0;
-                const lPrice = parseFloat(order.livraison) || 0;
-                const total = vBase + tPrice + dPrice + lPrice;
-                let calculatedPayed = 0;
-                if(order.isPricePayed) calculatedPayed += vBase;
-                if(order.isTransitPayed) calculatedPayed += tPrice;
-                if(order.isDouanePayed) calculatedPayed += dPrice;
-                if(order.isLivraisonPayed) calculatedPayed += lPrice;
+            const rows = this.orders.map((order) => {
+                const productFromDB = this.products.find(p => p.id === order.prodId) || 
+                                     this.products.find(p => p.name === order.prodName) || {};
                 
-                const isFinalised = (total - calculatedPayed) <= 0;
-                if(isFinalised) totalVal += total;
-                else {
-                    totalPen += total;
-                    penPayed += calculatedPayed;
-                    penRem += (total - calculatedPayed);
-                }
-
-                if(statusFilter === 'finalised') return isFinalised;
-                if(statusFilter === 'incomplete') return !isFinalised;
-                return true;
-            });
-
-            tbody.innerHTML = displayOrders.map((order, index) => {
-                const productFromDB = this.products.find(p => p.id === order.prodId) || {};
                 const img = productFromDB.img || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+                const qte = parseInt(order.quantity || order.qty) || 1;
+
                 const vBase = parseFloat(order.price) || 0;
                 const tPrice = parseFloat(order.transit) || 0;
                 const dPrice = parseFloat(order.douane) || 0;
                 const lPrice = parseFloat(order.livraison) || 0;
-                const total = vBase + tPrice + dPrice + lPrice;
+                
+                const unitTotal = vBase + tPrice + dPrice + lPrice;
+                const globalTotal = unitTotal * qte;
                 
                 let calculatedPayed = 0;
-                if(order.isPricePayed) calculatedPayed += vBase;
-                if(order.isTransitPayed) calculatedPayed += tPrice;
-                if(order.isDouanePayed) calculatedPayed += dPrice;
-                if(order.isLivraisonPayed) calculatedPayed += lPrice;
+                if(order.isPricePayed) calculatedPayed += (vBase * qte);
+                if(order.isTransitPayed) calculatedPayed += (tPrice * qte);
+                if(order.isDouanePayed) calculatedPayed += (dPrice * qte);
+                if(order.isLivraisonPayed) calculatedPayed += (lPrice * qte);
 
-                const reste = total - calculatedPayed;
-                const isFinalised = reste <= 0;
-                const dateDisplay = order.timestamp ? new Date(order.timestamp).toLocaleDateString('fr-FR') : "---";
+                const resteFinancier = globalTotal - calculatedPayed;
+                const isValidee = order.status === "Validée";
+                if(isValidee) totalVal += globalTotal; else totalPen += globalTotal;
+
+                const displayStatus = (order.status === "À lancer") ? "À commander" : (order.status || 'En attente');
+                const waveInfo = order.wave ? `<div class="badge bg-secondary" style="font-size:0.6rem;">Vague ${order.wave}</div>` : "";
 
                 return `
                 <tr>
@@ -457,201 +400,296 @@
                             <img src="${img}" class="cart-prod-img no-print">
                             <div>
                                 <div class="fw-bold text-dark">${order.prodName || 'Inconnu'}</div>
-                                <div class="text-primary fw-bold" style="font-size: 0.85rem;">${order.client || 'Client'}</div>
-                                <div class="text-muted small">${dateDisplay}</div>
+                                <div class="small text-primary fw-bold">${order.client || 'Client'}</div>
+                                ${waveInfo}
                             </div>
                         </div>
                     </td>
-                    <td class="text-center"><span class="badge bg-light text-dark border">${order.ref || '---'}</span></td>
+                    <td class="text-center fw-bold text-purple">${qte}</td>
                     <td>
                         <div class="d-flex justify-content-center gap-2">
-                            <div class="payment-detail-box"><span class="payment-label">Vente</span><span class="payment-value">${vBase.toLocaleString()}</span></div>
-                            <div class="payment-detail-box"><span class="payment-label">Trans.</span><span class="payment-value">${tPrice.toLocaleString()}</span></div>
-                            <div class="payment-detail-box"><span class="payment-label">Douane</span><span class="payment-value">${dPrice.toLocaleString()}</span></div>
-                            <div class="payment-detail-box"><span class="payment-label">Livr.</span><span class="payment-value">${lPrice.toLocaleString()}</span></div>
+                            <div class="payment-detail-box"><span class="payment-label">Vente</span><span class="payment-value">${order.isPricePayed ? vBase.toLocaleString() : '0'}</span></div>
+                            <div class="payment-detail-box"><span class="payment-label">Trans.</span><span class="payment-value">${order.isTransitPayed ? tPrice.toLocaleString() : '0'}</span></div>
+                            <div class="payment-detail-box"><span class="payment-label">Douane</span><span class="payment-value">${order.isDouanePayed ? dPrice.toLocaleString() : '0'}</span></div>
+                            <div class="payment-detail-box"><span class="payment-label">Livr.</span><span class="payment-value">${order.isLivraisonPayed ? lPrice.toLocaleString() : '0'}</span></div>
                         </div>
                     </td>
                     <td>
                         <div class="d-flex justify-content-center gap-2 border-start ps-2">
-                            <div class="payment-detail-box"><span class="payment-label">Total</span><span class="payment-value text-primary">${total.toLocaleString()}</span></div>
+                            <div class="payment-detail-box"><span class="payment-label">Total</span><span class="payment-value text-primary">${globalTotal.toLocaleString()}</span></div>
                             <div class="payment-detail-box"><span class="payment-label">Payé</span><span class="payment-value text-success">${calculatedPayed.toLocaleString()}</span></div>
-                            <div class="payment-detail-box"><span class="payment-label">Reste</span><span class="payment-value text-danger">${reste.toLocaleString()}</span></div>
+                            <div class="payment-detail-box"><span class="payment-label">Reste</span><span class="payment-value text-danger">${resteFinancier.toLocaleString()}</span></div>
                         </div>
                     </td>
-                    <td class="text-center">
-                        <span class="status-badge ${isFinalised ? 'status-finalise' : 'status-incomplet'}">${isFinalised ? 'FINALISÉ' : 'INCOMPLET'}</span>
-                    </td>
+                    <td class="text-center"><span class="status-badge ${isValidee ? 'status-validee' : 'status-lancer'}">${displayStatus}</span></td>
                     <td class="text-end no-print">
-                        <div class="d-flex gap-1 justify-content-end">
-                            <button class="btn btn-sm btn-info text-white rounded-pill px-2" style="font-size:0.7rem" onclick="CartManager.openInvoiceModal('${order.id}')"><i class="bi bi-file-earmark-text"></i> Facture</button>
-                            ${!isFinalised ? `<button class="btn btn-sm btn-success rounded-pill px-2" style="font-size:0.7rem" onclick="CartManager.openFinalizeModal('${order.id}')">Finaliser</button>` : ''}
-                            <button class="btn btn-sm btn-outline-danger rounded-circle" onclick="CartManager.deleteOrder('${order.id}')"><i class="bi bi-trash"></i></button>
-                        </div>
+                        <button class="btn btn-sm btn-outline-danger rounded-circle" onclick="CartManager.deleteOrder('${order.id}')"><i class="bi bi-trash"></i></button>
                     </td>
                 </tr>`;
-            }).reverse().join('');
+            });
 
-            this.updateSummary(totalVal, totalPen, penPayed, penRem);
+            tbody.innerHTML = rows.reverse().join('');
+            this.updateSummary(totalVal, totalPen);
         },
 
-        openInvoiceModal(orderId) {
-            const order = this.orders.find(o => o.id === orderId);
-            if(!order) return;
-            this.currentInvoiceOrder = order;
+        validateOrder() {
+            const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+            if (!this.orders || this.orders.length === 0) return alert("Le panier est vide");
 
-            const vBase = parseFloat(order.price) || 0;
-            const tPrice = parseFloat(order.transit) || 0;
-            const dPrice = parseFloat(order.douane) || 0;
-            const lPrice = parseFloat(order.livraison) || 0;
-            
-            const total = vBase + tPrice + dPrice + lPrice;
-            let payed = 0;
-            if(order.isPricePayed) payed += vBase;
-            if(order.isTransitPayed) payed += tPrice;
-            if(order.isDouanePayed) payed += dPrice;
-            if(order.isLivraisonPayed) payed += lPrice;
+            const totalGlobal = this.orders.reduce((acc, o) => {
+                const qte = parseInt(o.quantity || o.qty) || 1;
+                return acc + ((parseFloat(o.price) || 0) + (parseFloat(o.transit) || 0) + (parseFloat(o.douane) || 0) + (parseFloat(o.livraison) || 0)) * qte;
+            }, 0);
 
-            document.getElementById('inv_ref').innerText = order.id.split('-').pop().toUpperCase();
-            document.getElementById('inv_date').innerText = new Date(order.timestamp || Date.now()).toLocaleDateString('fr-FR');
-            document.getElementById('inv_clientName').innerText = order.client.toUpperCase();
-            
-            document.getElementById('invoiceTableBody').innerHTML = `
-                <tr>
-                    <td><strong>Prix de vente - ${order.prodName}</strong></td>
-                    <td class="text-center">Ref: ${order.ref || '---'}</td>
-                    <td class="text-center">${order.isPricePayed ? '✅ Payé' : '❌ Non payé'}</td>
-                    <td class="text-end">${vBase.toLocaleString()}</td>
-                </tr>
-                <tr>
-                    <td>Frais de Transit</td>
-                    <td class="text-center">Importation</td>
-                    <td class="text-center">${order.isTransitPayed ? '✅ Payé' : '❌ Non payé'}</td>
-                    <td class="text-end">${tPrice.toLocaleString()}</td>
-                </tr>
-                <tr>
-                    <td>Frais de Douane</td>
-                    <td class="text-center">Taxes</td>
-                    <td class="text-center">${order.isDouanePayed ? '✅ Payé' : '❌ Non payé'}</td>
-                    <td class="text-end">${dPrice.toLocaleString()}</td>
-                </tr>
-                <tr>
-                    <td>Frais de Livraison</td>
-                    <td class="text-center">Transport</td>
-                    <td class="text-center">${order.isLivraisonPayed ? '✅ Payé' : '❌ Non payé'}</td>
-                    <td class="text-end">${lPrice.toLocaleString()}</td>
-                </tr>
-                <tr class="invoice-total-row">
-                    <td colspan="3" class="text-end">MONTANT TOTAL</td>
-                    <td class="text-end text-primary">${total.toLocaleString()}</td>
-                </tr>
-                <tr>
-                    <td colspan="3" class="text-end">MONTANT ENCAISSÉ</td>
-                    <td class="text-end text-success">${payed.toLocaleString()}</td>
-                </tr>
-                <tr class="fw-bold bg-light">
-                    <td colspan="3" class="text-end">RESTE À PAYER</td>
-                    <td class="text-end text-danger">${(total - payed).toLocaleString()}</td>
-                </tr>
-            `;
+            const orderData = {
+                userId: session ? session.name : 'Inconnu',
+                items: this.orders,
+                total: totalGlobal,
+                date: Date.now()
+            };
 
-            new bootstrap.Modal(document.getElementById('invoiceModal')).show();
+            push(ref(db, 'commandes'), orderData);
+            notifyAdmin('NOUVELLE COMMANDE', { total: totalGlobal, user: session ? session.name : 'Inconnu' });
+
+            alert("Commande envoyée et synchronisée !");
         },
 
-        printProfessionalInvoice() {
-            const content = document.getElementById('invoicePaperToPrint').cloneNode(true);
-            const printArea = document.getElementById('printArea');
-            printArea.innerHTML = "";
-            printArea.appendChild(content);
+        printProfessionalReport() {
+            const tableContent = document.querySelector('.table-orders').cloneNode(true);
+            const printContent = document.getElementById('printContent');
+            printContent.innerHTML = "";
+            printContent.appendChild(tableContent);
+            printContent.querySelectorAll('.no-print, .text-end:last-child, th:last-child').forEach(el => el.remove());
             setTimeout(() => { window.print(); }, 500);
         },
 
-        copyInvoiceWA() {
-            if(!this.currentInvoiceOrder) return;
-            const o = this.currentInvoiceOrder;
+        openRecapModal() {
+            const modal = new bootstrap.Modal(document.getElementById('recapModal'));
+            modal.show();
+        },
+
+        updateWaveOptions() {
+            const productName = document.getElementById('recapSelect').value;
+            const waveSelect = document.getElementById('recapWaveSelect');
+            if(!productName) {
+                waveSelect.innerHTML = '<option value="">-- Vague --</option>';
+                return;
+            }
+            const productOrders = this.orders.filter(o => o.prodName === productName);
+            const waves = [...new Set(productOrders.map(o => o.wave || 1))].sort((a,b) => b-a);
+            waveSelect.innerHTML = waves.map(w => `<option value="${w}">Vague ${w}</option>`).join('');
+            this.updateRecapPreview();
+        },
+
+        updateRecapPreview() {
+            const productName = document.getElementById('recapSelect').value;
+            const wave = parseInt(document.getElementById('recapWaveSelect').value) || 1;
+            const preview = document.getElementById('recapPreview');
+            
+            if(productName === "") { preview.innerText = "Sélectionnez un produit et une vague..."; return; }
+            
             const config = JSON.parse(localStorage.getItem(CONFIG_KEY)) || {};
-            const total = (parseFloat(o.price) || 0) + (parseFloat(o.transit) || 0) + (parseFloat(o.douane) || 0) + (parseFloat(o.livraison) || 0);
-            let payed = 0;
-            if(o.isPricePayed) payed += parseFloat(o.price);
-            if(o.isTransitPayed) payed += parseFloat(o.transit);
-            if(o.isDouanePayed) payed += parseFloat(o.douane);
-            if(o.isLivraisonPayed) payed += parseFloat(o.livraison);
-            const msg = `🧾 *FACTURE*\n🏢 *${config.companyName || 'MT & B-One'}*\n👤 *Client :* ${o.client}\n📦 *Produit :* ${o.prodName}\n💰 *Total :* ${total.toLocaleString()} F\n✅ *Payé :* ${payed.toLocaleString()} F\n🛑 *Reste :* ${(total - payed).toLocaleString()} F\n✍️ _Signé : ${config.ceoName || 'La Direction'}_`;
-            navigator.clipboard.writeText(msg).then(() => alert("Copié pour WhatsApp !"));
+            const productDB = this.products.find(p => p.name === productName && (p.currentWave == wave || !p.currentWave)) || {};
+            const clientOrders = this.orders.filter(o => o.prodName === productName && (o.wave == wave || (!o.wave && wave == 1)));
+            
+            let totalGlobal = 0, totalPayeGlobal = 0, totalQte = 0;
+            let detailText = "";
+
+            clientOrders.forEach((o, i) => {
+                const qte = parseInt(o.quantity || o.qty) || 1;
+                const vBase = parseFloat(o.price) || 0;
+                const tPrice = parseFloat(o.transit) || 0;
+                const dPrice = parseFloat(o.douane) || 0;
+                const lPrice = parseFloat(o.livraison) || 0;
+                
+                const unitTotal = vBase + tPrice + dPrice + lPrice;
+                const globalTotal = unitTotal * qte;
+                
+                let payed = 0;
+                if(o.isPricePayed) payed += (vBase * qte);
+                if(o.isTransitPayed) payed += (tPrice * qte);
+                if(o.isDouanePayed) payed += (dPrice * qte);
+                if(o.isLivraisonPayed) payed += (lPrice * qte);
+
+                const totalRest = globalTotal - payed;
+                totalGlobal += globalTotal;
+                totalPayeGlobal += payed;
+                totalQte += qte;
+
+                detailText += `${i+1}. 👤 *${o.client || 'Client'}* (Qté: ${qte})\n` +
+                              `   💰 Vente: ${o.isPricePayed ? vBase.toLocaleString() : '0'} F [${o.isPricePayed ? '✅' : '❌'}]\n` +
+                              `   🚢 Transit: ${o.isTransitPayed ? tPrice.toLocaleString() : '0'} F [${o.isTransitPayed ? '✅' : '❌'}]\n` +
+                              `   🛃 Douane: ${o.isDouanePayed ? dPrice.toLocaleString() : '0'} F [${o.isDouanePayed ? '✅' : '❌'}]\n` +
+                              `   🚚 Livr: ${o.isLivraisonPayed ? lPrice.toLocaleString() : '0'} F [${o.isLivraisonPayed ? '✅' : '❌'}]\n` +
+                              `   --------------------------\n` +
+                              `   💵 TOTAL: ${globalTotal.toLocaleString()} F | ✅ PAYÉ: ${payed.toLocaleString()} F\n` +
+                              `   🛑 RESTE: ${totalRest.toLocaleString()} F\n` +
+                              `   __________________________\n\n`;
+            });
+
+            const minQty = parseInt(productDB.minQty || clientOrders[0]?.minOrderRequired) || 0;
+            const resteQte = Math.max(0, minQty - totalQte);
+            const vagueStatus = totalQte >= minQty ? "✅ COMMANDE BOUCLÉE POUR CETTE VAGUE" : "⏳ COMMANDE EN COURS POUR CETTE VAGUE";
+
+            const msg = `*POINT PAR PRODUIT : ${productName} (VAGUE ${wave})*\n` +
+                `🏢 *ENTREPRISE :* ${config.companyName || 'MT & B-One'}\n` +
+                `📢 *STATUT : ${vagueStatus}*\n` +
+                `📦 *ÉTAT DES QUANTITÉS :* ${totalQte} / ${minQty} (Min requis: ${minQty}, Manque: ${resteQte})\n` +
+                `----------------------------------\n` +
+                detailText +
+                `📊 *BILAN GLOBAL*\n` +
+                `🔢 Qté Totale : ${totalQte}\n` +
+                `💰 Valeur : ${totalGlobal.toLocaleString()} F CFA\n` +
+                `💵 Encaissé : ${totalPayeGlobal.toLocaleString()} F CFA\n` +
+                `🔥 *À PERCEVOIR : ${(totalGlobal - totalPayeGlobal).toLocaleString()} F CFA*\n` +
+                `----------------------------------\n` +
+                `✍️ _Signé : ${config.ceoName || 'La Direction'}_`;
+            
+            preview.innerText = msg;
         },
 
-        openFinalizeModal(orderId) {
-            this.currentFinalizingId = orderId;
-            const order = this.orders.find(o => o.id === orderId);
-            if(!order) return;
-            document.getElementById('finalizeClientName').innerText = `Règlement pour : ${order.client}`;
-            const container = document.getElementById('finalizeCheckboxes');
-            const items = [
-                { id: 'isPricePayed', label: 'Vente', val: order.price },
-                { id: 'isTransitPayed', label: 'Transit', val: order.transit },
-                { id: 'isDouanePayed', label: 'Douane', val: order.douane },
-                { id: 'isLivraisonPayed', label: 'Livraison', val: order.livraison }
-            ];
-            container.innerHTML = items.map(item => `
-                <div class="form-check p-3 border rounded-3 ${order[item.id] ? 'bg-light opacity-50' : ''}">
-                    <input class="form-check-input ms-0 me-3" type="checkbox" id="chk_${item.id}" ${order[item.id] ? 'checked disabled' : ''}>
-                    <label class="form-check-label d-flex justify-content-between w-100" for="chk_${item.id}">
-                        <span class="fw-bold">${item.label}</span>
-                        <span class="text-primary">${parseFloat(item.val).toLocaleString()} F</span>
-                    </label>
-                </div>
-            `).join('');
-            new bootstrap.Modal(document.getElementById('finalizeModal')).show();
+        copyAllOrdersRecap() {
+            const config = JSON.parse(localStorage.getItem(CONFIG_KEY)) || {};
+            if(this.orders.length === 0) return alert("Aucune commande à copier.");
+
+            const availableWaves = [...new Set(this.orders.map(o => o.wave || 1))].sort((a,b) => b-a);
+            const selectedWave = prompt(`Choisissez le numéro de vague pour le rapport global (Vagues dispo: ${availableWaves.join(', ')})`, availableWaves[0]);
+            
+            if(!selectedWave) return;
+            const waveNum = parseInt(selectedWave);
+
+            const filteredOrders = this.orders.filter(o => (o.wave || 1) == waveNum);
+            if(filteredOrders.length === 0) return alert("Aucune commande trouvée pour cette vague.");
+
+            const grouped = filteredOrders.reduce((acc, order) => {
+                if (!acc[order.prodName]) acc[order.prodName] = [];
+                acc[order.prodName].push(order);
+                return acc;
+            }, {});
+
+            let finalMsg = `*RÉCAPITULATIF GÉNÉRAL DES VENTES (VAGUE ${waveNum})*\n🏢 *${config.companyName || 'MT & B-One'}*\n📅 Date : ${new Date().toLocaleDateString('fr-FR')}\n\n`;
+
+            for (const productName in grouped) {
+                const productDB = this.products.find(p => p.name === productName && (p.currentWave == waveNum || !p.currentWave)) || {};
+                let totalProdValue = 0;
+                let totalProdPayed = 0;
+                let totalProdQte = 0;
+                let detailText = "";
+
+                grouped[productName].forEach((o, i) => {
+                    const qte = parseInt(o.quantity || o.qty) || 1;
+                    const vBase = parseFloat(o.price) || 0;
+                    const tPrice = parseFloat(o.transit) || 0;
+                    const dPrice = parseFloat(o.douane) || 0;
+                    const lPrice = parseFloat(o.livraison) || 0;
+                    
+                    const unitTotal = vBase + tPrice + dPrice + lPrice;
+                    const globalTotal = unitTotal * qte;
+
+                    let payed = 0;
+                    if(o.isPricePayed) payed += (vBase * qte);
+                    if(o.isTransitPayed) payed += (tPrice * qte);
+                    if(o.isDouanePayed) payed += (dPrice * qte);
+                    if(o.isLivraisonPayed) payed += (lPrice * qte);
+                    
+                    totalProdValue += globalTotal;
+                    totalProdPayed += payed;
+                    totalProdQte += qte;
+
+                    detailText += `${i+1}. 👤 *${o.client}* (Qté: ${qte})\n` +
+                                  `   💰 Vente: ${o.isPricePayed ? vBase.toLocaleString() : '0'} F [${o.isPricePayed ? '✅' : '❌'}]\n` +
+                                  `   🚢 Transit: ${o.isTransitPayed ? tPrice.toLocaleString() : '0'} F [${o.isTransitPayed ? '✅' : '❌'}]\n` +
+                                  `   🛃 Douane: ${o.isDouanePayed ? dPrice.toLocaleString() : '0'} F [${o.isDouanePayed ? '✅' : '❌'}]\n` +
+                                  `   🚚 Livr: ${o.isLivraisonPayed ? lPrice.toLocaleString() : '0'} F [${o.isLivraisonPayed ? '✅' : '❌'}]\n` +
+                                  `   --------------------------\n` +
+                                  `   💵 TOTAL: ${globalTotal.toLocaleString()} F | ✅ PAYÉ: ${payed.toLocaleString()} F\n` +
+                                  `   🛑 RESTE: ${(globalTotal - payed).toLocaleString()} F\n` +
+                                  `   __________________________\n\n`;
+                });
+
+                const minQty = parseInt(productDB.minQty || grouped[productName][0]?.minOrderRequired) || 0;
+                const resteQte = Math.max(0, minQty - totalProdQte);
+                const vagueStatus = totalProdQte >= minQty ? "✅ COMMANDE BOUCLÉE POUR CETTE VAGUE" : "⏳ COMMANDE EN COURS POUR CETTE VAGUE";
+
+                finalMsg += `*POINT PAR PRODUIT : ${productName.toUpperCase()} (VAGUE ${waveNum})*\n` +
+                            `📢 *STATUT : ${vagueStatus}*\n` +
+                            `📦 *ÉTAT DES QUANTITÉS :* ${totalProdQte} / ${minQty} (Min requis: ${minQty}, Manque: ${resteQte})\n` +
+                            `----------------------------------\n` +
+                            detailText +
+                            `📊 *BILAN PRODUIT*\n` +
+                            `🔢 Qté Totale : ${totalProdQte}\n` +
+                            `💰 Valeur : ${totalProdValue.toLocaleString()} F CFA\n` +
+                            `💵 Encaissé : ${totalProdPayed.toLocaleString()} F CFA\n` +
+                            `🔥 *À PERCEVOIR : ${(totalProdValue - totalProdPayed).toLocaleString()} F CFA*\n` +
+                            `----------------------------------\n\n`;
+            }
+
+            finalMsg += `✍️ _Signé : ${config.ceoName || 'Le PDG'}_`;
+
+            navigator.clipboard.writeText(finalMsg).then(() => alert("Récapitulatif complet de la vague " + waveNum + " copié !"));
         },
 
-        submitFinalization() {
-            const order = this.orders.find(o => o.id === this.currentFinalizingId);
-            if(!order) return;
-            order.isPricePayed = document.getElementById('chk_isPricePayed').checked;
-            order.isTransitPayed = document.getElementById('chk_isTransitPayed').checked;
-            order.isDouanePayed = document.getElementById('chk_isDouanePayed').checked;
-            order.isLivraisonPayed = document.getElementById('chk_isLivraisonPayed').checked;
-            localStorage.setItem(ORDERS_KEY, JSON.stringify(this.orders));
-            bootstrap.Modal.getInstance(document.getElementById('finalizeModal')).hide();
-            const overlay = document.getElementById('successOverlay');
-            overlay.style.display = 'flex';
-            setTimeout(() => { 
-                overlay.style.display = 'none'; 
-                this.renderOrders(); 
-                // Synchronisation Cloud après mise à jour règlement
-                if(window.SyncManager) window.SyncManager.syncAll();
-            }, 2000);
+        copyAndCloseRecap() {
+            const preview = document.getElementById('recapPreview');
+            const msg = preview.innerText;
+            if(msg.includes("Sélectionnez un produit")) return;
+            navigator.clipboard.writeText(msg).then(() => {
+                alert("Point copié !");
+                bootstrap.Modal.getInstance(document.getElementById('recapModal')).hide();
+            });
         },
 
-        updateSummary(validated, pending, pendingPayed, pendingRemaining) {
-            document.getElementById('totalValidated').innerText = (validated || 0).toLocaleString() + " F";
-            document.getElementById('totalPending').innerText = (pending || 0).toLocaleString() + " F";
-            document.getElementById('pendingPayed').innerText = (pendingPayed || 0).toLocaleString() + " F";
-            document.getElementById('pendingRemaining').innerText = (pendingRemaining || 0).toLocaleString() + " F";
+        updateSummary(validated, pending) {
+            document.getElementById('totalValidated').innerText = (validated || 0).toLocaleString() + " F CFA";
+            document.getElementById('totalPending').innerText = (pending || 0).toLocaleString() + " F CFA";
             document.getElementById('grandTotal').innerText = ((validated || 0) + (pending || 0)).toLocaleString() + " F CFA";
         },
 
-        deleteOrder(id) {
-            if(confirm("Voulez-vous supprimer cette commande du système ?")) {
-                this.orders = this.orders.filter(o => o.id !== id);
+        deleteOrder(orderId) {
+            if(confirm("Supprimer cette commande ?")) {
+                this.orders = this.orders.filter(o => o.id !== orderId);
                 localStorage.setItem(ORDERS_KEY, JSON.stringify(this.orders));
                 this.renderOrders();
-                
-                // Notification au Cloud
-                if(window.SyncManager) {
-                    window.SyncManager.deleteItem('BONE_ORDERS_HISTORY', id);
-                }
             }
         },
 
-        clearOrders() { if(confirm("Vider l'historique ?")) { localStorage.removeItem(ORDERS_KEY); this.renderOrders(); } },
-        openRecapModal() { new bootstrap.Modal(document.getElementById('recapModal')).show(); },
-        updateRecapPreview() { /* Logique recap ici */ }
+        clearOrders() {
+            if(confirm("Voulez-vous vraiment vider tout l'historique ?")) {
+                localStorage.removeItem(ORDERS_KEY);
+                this.renderOrders();
+                alert("Historique vidé.");
+            }
+        }
     };
 
+    window.CartManager = CartManager;
     window.onload = () => CartManager.init();
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="google-sheets-sync.js"></script>
+
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('Service Worker enregistré !', reg.scope))
+                .catch(err => console.error('Erreur d\'enregistrement SW :', err));
+        });
+    }
+</script>
+
+<button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
+    <i class="bi bi-power fs-4"></i>
+</button>
+
+<script>
+    function logout() {
+        if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
+            localStorage.removeItem('BONE_USER_SESSION');
+            window.location.href = 'login.html';
+        }
+    }
+</script>
+
 </body>
 </html>

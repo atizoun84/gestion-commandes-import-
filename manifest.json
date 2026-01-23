@@ -1,24 +1,21 @@
 {
-  "name": "B-One Smart",
-  "short_name": "B-One",
-  "description": "Tableau de bord de gestion B-One Smart",
-  "start_url": "index.html",
-  "display": "standalone",
-  "background_color": "#f4f7f6",
-  "theme_color": "#7d2ae8",
-  "orientation": "portrait",
+  "short_name": "B-One&MTT",
+  "name": "Application de Atizoun Plateny AMOUSSOU",
+  "description": "Application développée par Atizoun Plateny AMOUSSOU (atizoun@gmail.com)",
   "icons": [
     {
       "src": "logoapp.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     },
     {
       "src": "logoapp.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
-  ]
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#7d2ae8",
+  "background_color": "#f4f7f6"
 }

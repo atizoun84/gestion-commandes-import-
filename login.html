@@ -112,6 +112,10 @@
             <div class="bg-light p-2 rounded mb-3">
                 <input type="text" id="newUserName" class="form-control form-control-sm mb-2" placeholder="Nom (ex: Utilisateur 1)">
                 <input type="password" id="newUserPass" class="form-control form-control-sm mb-2" placeholder="Nouveau mot de passe">
+                <select id="newUserRole" class="form-select form-select-sm mb-2">
+                    <option value="user">Accès Utilisateur</option>
+                    <option value="admin">Accès Admin</option>
+                </select>
                 <button class="btn btn-success btn-sm w-100" onclick="saveUser()">Enregistrer / Modifier</button>
             </div>
             <div id="usersListManage" class="mt-2">
@@ -134,13 +138,14 @@
     const USERS_DB_KEY = 'BONE_USERS_ACCOUNTS';
     const SESSION_KEY = 'BONE_USER_SESSION';
 
-    // Données par défaut
+    // Données par défaut réinitialisées (PDG + 4 Utilisateurs)
     const defaultUsers = {
-        "PDG": { password: "Admin2025", role: "admin" }
+        "PDG": { password: "Admin2025", role: "admin" },
+        "Utilisateur 1": { password: "User001", role: "user" },
+        "Utilisateur 2": { password: "User002", role: "user" },
+        "Utilisateur 3": { password: "User003", role: "user" },
+        "Utilisateur 4": { password: "User004", role: "user" }
     };
-    for(let i=1; i<=10; i++) {
-        defaultUsers[`Utilisateur ${i}`] = { password: `UserB10${i}`, role: 'user' };
-    }
 
     let users = JSON.parse(localStorage.getItem(USERS_DB_KEY)) || defaultUsers;
 
@@ -155,7 +160,7 @@
             if(name !== 'PDG') {
                 const opt = document.createElement('option');
                 opt.value = name;
-                opt.textContent = name;
+                opt.textContent = `${name} (${users[name].role === 'admin' ? 'ADMIN' : 'USER'})`;
                 select.appendChild(opt);
             }
 
@@ -163,7 +168,7 @@
             const item = document.createElement('div');
             item.className = 'user-item';
             item.innerHTML = `
-                <span>${name}</span>
+                <span>${name} <small class="text-muted">(${users[name].role})</small></span>
                 <div>
                     <button class="btn btn-sm btn-outline-primary py-0" onclick="editUser('${name}')" title="Modifier"><i class="bi bi-pencil"></i></button>
                     ${name !== 'PDG' ? `<button class="btn btn-sm btn-outline-danger py-0" onclick="deleteUser('${name}')" title="Supprimer"><i class="bi bi-trash"></i></button>` : ''}
@@ -226,24 +231,27 @@
     function saveUser() {
         const name = document.getElementById('newUserName').value.trim();
         const pass = document.getElementById('newUserPass').value;
+        const role = document.getElementById('newUserRole').value;
 
         if(!name || !pass) return alert("Veuillez remplir tous les champs");
 
-        // On garde le rôle 'admin' si on modifie le PDG, sinon 'user'
-        const role = (users[name] && users[name].role === 'admin') ? 'admin' : 'user';
+        // Le PDG reste toujours Admin, pour les autres on utilise le rôle sélectionné
+        const finalRole = (name === 'PDG') ? 'admin' : role;
         
-        users[name] = { password: pass, role: role };
+        users[name] = { password: pass, role: finalRole };
         localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
         
-        alert(`Utilisateur ${name} enregistré/modifié avec succès !`);
+        alert(`Utilisateur ${name} (${finalRole}) enregistré/modifié avec succès !`);
         document.getElementById('newUserName').value = '';
         document.getElementById('newUserPass').value = '';
+        document.getElementById('newUserRole').value = 'user';
         init();
     }
 
     function editUser(name) {
         document.getElementById('newUserName').value = name;
         document.getElementById('newUserPass').value = users[name].password;
+        document.getElementById('newUserRole').value = users[name].role;
         document.getElementById('newUserName').focus();
     }
 

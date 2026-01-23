@@ -10,6 +10,8 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="B-One Maint">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
@@ -55,6 +57,9 @@
 
         /* Footer Signature */
         .footer-concepteur { background: #212529; color: white; text-align: center; padding: 20px 10px; margin-top: auto; }
+        
+        /* Ajustement Notification */
+        .text-purple { color: var(--canva-purple); }
     </style>
 </head>
 <body>
@@ -69,9 +74,26 @@
                     <span class="promoter-name">Système de Gestion Officiel</span>
                 </div>
             </div>
-            <button class="navbar-toggler border-white" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
-                <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
-            </button>
+
+            <div class="ms-auto d-flex align-items-center">
+                <div class="position-relative d-inline-block me-3" id="adminNotifGroup" style="display:none !important;">
+                    <button class="btn btn-light rounded-circle shadow-sm" data-bs-toggle="dropdown">
+                        <i class="bi bi-bell-fill text-purple"></i>
+                        <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" id="notifList" style="width: 300px; max-height: 400px; overflow-y: auto;">
+                        <li class="dropdown-header">Derniers mouvements</li>
+                        <div id="notifItems"></div>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button onclick="clearAllNotifs()" class="dropdown-item text-center text-danger fw-bold">Supprimer l'historique (Code requis)</button></li>
+                    </ul>
+                </div>
+
+                <button class="navbar-toggler border-white" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                    <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
+                </button>
+            </div>
+
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto text-end">
                     <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
@@ -145,13 +167,12 @@
 </footer>
 
 <script>
-    // Logique PWA : Enregistrement du Service Worker
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('PWA: Service Worker enregistré !'))
-                .catch(err => console.log('PWA: Erreur d\'enregistrement SW:', err));
-        });
+    // Vérification stricte Admin
+    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+
+    if (!session || session.role !== 'admin') {
+        alert("Accès refusé. Seul l'administrateur peut accéder à cette page.");
+        window.location.href = 'login.html';
     }
 
     const STORAGE_KEY = 'BONE_OFFICIAL_CONFIG_V2';
@@ -169,8 +190,9 @@
         },
 
         export() {
-            if(!confirm("Générer un fichier de sauvegarde ?")) return;
+            if(!confirm("Générer un fichier de sauvegarde incluant TOUTES les données de l'application ?")) return;
             const data = {};
+            // Extraction de TOUTES les clés du localStorage sans exception
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
                 data[key] = localStorage.getItem(key);
@@ -179,7 +201,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `BONE_BACKUP_${new Date().toISOString().slice(0,10)}.json`;
+            a.download = `BONE_FULL_BACKUP_${new Date().toISOString().slice(0,10)}.json`;
             a.click();
         },
 
@@ -218,7 +240,6 @@
         const config = JSON.parse(localStorage.getItem(STORAGE_KEY));
         if (config) {
             if (config.logo) document.getElementById('navLogo').src = config.logo;
-            // Priorité au nom dans le localStorage, sinon MT & B-One par défaut
             document.getElementById('navCompanyName').innerText = config.companyName || "MT & B-One";
         } else {
             document.getElementById('navCompanyName').innerText = "MT & B-One";
@@ -227,7 +248,78 @@
     };
 </script>
 
+<script type="module">
+    import { db, ref, onValue, remove } from './firebase-config.js';
+    
+    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+    if(session && session.role === 'admin') {
+        document.getElementById('adminNotifGroup').style.display = 'inline-block';
+        
+        // Écoute en temps réel des notifications
+        onValue(ref(db, 'notifications'), (snapshot) => {
+            const data = snapshot.val();
+            const badge = document.getElementById('notifBadge');
+            const container = document.getElementById('notifItems');
+            container.innerHTML = '';
+            
+            if(data) {
+                const list = Object.entries(data).reverse(); // Plus récents en premier
+                const unreadCount = list.filter(n => !n[1].read).length;
+                
+                badge.innerText = unreadCount;
+                badge.style.display = unreadCount > 0 ? 'block' : 'none';
+
+                list.forEach(([id, notif]) => {
+                    container.innerHTML += `
+                        <li class="p-2 border-bottom">
+                            <small class="text-muted">${new Date(notif.timestamp).toLocaleString()}</small><br>
+                            <strong>${notif.user}</strong>: ${notif.type}<br>
+                            <span class="text-secondary small">${JSON.stringify(notif.details)}</span>
+                        </li>`;
+                });
+            } else {
+                container.innerHTML = '<li class="p-3 text-center text-muted">Aucun mouvement</li>';
+                badge.style.display = 'none';
+            }
+        });
+    }
+
+    // Fonction de suppression sécurisée
+    window.clearAllNotifs = () => {
+        const code = prompt("Entrez le code Admin pour supprimer l'historique :");
+        if(code === "1234") { // Remplacez par votre code secret
+            remove(ref(db, 'notifications'));
+            alert("Historique vidé !");
+        } else {
+            alert("Code incorrect !");
+        }
+    };
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="google-sheets-sync.js"></script>
+
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('Service Worker enregistré !', reg))
+                .catch(err => console.error('Échec enregistrement SW:', err));
+        });
+    }
+</script>
+
+<button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
+    <i class="bi bi-power fs-4"></i>
+</button>
+
+<script>
+    function logout() {
+        if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
+            localStorage.removeItem('BONE_USER_SESSION');
+            window.location.href = 'login.html';
+        }
+    }
+</script>
+
 </body>
 </html>

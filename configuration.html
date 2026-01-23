@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MT & B-One | Configuration Officielle</title>
     
     <link rel="manifest" href="./manifest.json">
@@ -63,6 +63,9 @@
 
         .associate-row, .momo-row { background: #f8f9fa; border-radius: 15px; padding: 15px; margin-bottom: 10px; border: 1px solid #eee; }
         .locked-mode .associate-row, .locked-mode .momo-row { background: var(--blue-readonly); border: none; }
+        
+        /* Style additionnel pour les notifs */
+        .text-purple { color: var(--canva-purple); }
     </style>
 </head>
 <body>
@@ -77,9 +80,26 @@
                     <span class="promoter-name">Interface de Gestion PDG</span>
                 </div>
             </div>
-            <button class="navbar-toggler border-white" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
-                <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
-            </button>
+
+            <div class="ms-auto d-flex align-items-center">
+                <div class="position-relative d-inline-block me-3" id="adminNotifGroup" style="display:none !important;">
+                    <button class="btn btn-light rounded-circle shadow-sm" data-bs-toggle="dropdown">
+                        <i class="bi bi-bell-fill text-purple"></i>
+                        <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" id="notifList" style="width: 300px; max-height: 400px; overflow-y: auto;">
+                        <li class="dropdown-header">Derniers mouvements</li>
+                        <div id="notifItems"></div>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button onclick="clearAllNotifs()" class="dropdown-item text-center text-danger fw-bold">Supprimer l'historique (Code requis)</button></li>
+                    </ul>
+                </div>
+
+                <button class="navbar-toggler border-white" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                    <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
+                </button>
+            </div>
+
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto text-end">
                     <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
@@ -210,6 +230,14 @@
 </footer>
 
 <script>
+    // Vérification stricte Admin
+    const sessionLocal = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+
+    if (!sessionLocal || sessionLocal.role !== 'admin') {
+        alert("Accès refusé. Seul l'administrateur peut accéder à cette page.");
+        window.location.href = 'login.html';
+    }
+
     // Logique PWA : Enregistrement du Service Worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -228,20 +256,17 @@
             isLocked = true;
             document.body.classList.add('locked-mode');
             
-            // Verrouiller champs standards
             fields.forEach(id => {
                 const el = document.getElementById(id);
                 if(el.tagName === 'SELECT') el.disabled = true;
                 else el.readOnly = true;
             });
 
-            // Verrouiller champs mobiles money
             document.querySelectorAll('.momo-input').forEach(el => el.readOnly = true);
             document.querySelectorAll('.momo-select').forEach(el => el.disabled = true);
             document.querySelectorAll('.btn-remove-momo').forEach(el => el.classList.add('hidden-el'));
             document.getElementById('addMomo').classList.add('hidden-el');
 
-            // Verrouiller champs associés
             document.querySelectorAll('.assoc-input').forEach(el => el.readOnly = true);
             document.querySelectorAll('.assoc-select').forEach(el => el.disabled = true);
             document.querySelectorAll('.btn-remove-assoc').forEach(el => el.classList.add('hidden-el'));
@@ -341,7 +366,6 @@
             const config = {};
             fields.forEach(id => config[id] = document.getElementById(id).value);
             
-            // Sauvegarde des comptes Momo
             config.momoAccounts = [];
             document.querySelectorAll('.momo-row').forEach(row => {
                 config.momoAccounts.push({
@@ -350,7 +374,6 @@
                 });
             });
 
-            // Sauvegarde des associés
             config.associates = [];
             document.querySelectorAll('.associate-row').forEach(row => {
                 config.associates.push({
@@ -388,13 +411,11 @@
             }
             fields.forEach(id => { if(data[id]) document.getElementById(id).value = data[id]; });
             
-            // Charger les comptes Momo
             if(data.momoAccounts) {
                 document.getElementById('momoContainer').innerHTML = '';
                 data.momoAccounts.forEach(acc => UI.createMomoRow(acc.network, acc.phone));
             }
 
-            // Charger les associés
             if(data.associates) {
                 document.getElementById('associatesContainer').innerHTML = '';
                 data.associates.forEach(assoc => UI.createAssociateRow(assoc.country, assoc.phone));
@@ -445,7 +466,67 @@
     window.onload = () => Data.load();
 </script>
 
+<script type="module">
+    import { db, ref, onValue, remove } from './firebase-config.js';
+    
+    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+    if(session && session.role === 'admin') {
+        document.getElementById('adminNotifGroup').style.display = 'inline-block';
+        
+        onValue(ref(db, 'notifications'), (snapshot) => {
+            const data = snapshot.val();
+            const badge = document.getElementById('notifBadge');
+            const container = document.getElementById('notifItems');
+            container.innerHTML = '';
+            
+            if(data) {
+                const list = Object.entries(data).reverse(); 
+                const unreadCount = list.filter(n => !n[1].read).length;
+                
+                badge.innerText = unreadCount;
+                badge.style.display = unreadCount > 0 ? 'block' : 'none';
+
+                list.forEach(([id, notif]) => {
+                    container.innerHTML += `
+                        <li class="p-2 border-bottom">
+                            <small class="text-muted">${new Date(notif.timestamp).toLocaleString()}</small><br>
+                            <strong>${notif.user}</strong>: ${notif.type}<br>
+                            <span class="text-secondary small">${JSON.stringify(notif.details)}</span>
+                        </li>`;
+                });
+            } else {
+                container.innerHTML = '<li class="p-3 text-center text-muted">Aucun mouvement</li>';
+                badge.style.display = 'none';
+            }
+        });
+    }
+
+    window.clearAllNotifs = () => {
+        const code = prompt("Entrez le code Admin pour supprimer l'historique :");
+        if(code === "1234") { 
+            remove(ref(db, 'notifications'));
+            alert("Historique vidé !");
+        } else {
+            alert("Code incorrect !");
+        }
+    };
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="google-sheets-sync.js"></script>
+
+<button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
+    <i class="bi bi-power fs-4"></i>
+</button>
+
+<script>
+    function logout() {
+        if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
+            localStorage.removeItem('BONE_USER_SESSION');
+            window.location.href = 'login.html';
+        }
+    }
+</script>
+
 </body>
 </html>

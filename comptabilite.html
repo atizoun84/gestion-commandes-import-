@@ -75,6 +75,8 @@
             .table { width: 100%; border-collapse: collapse; page-break-inside: auto; font-size: 9pt; }
             th, td { border: 1px solid #ddd !important; padding: 4px !important; }
         }
+
+        .text-purple { color: var(--canva-purple); }
     </style>
 </head>
 <body>
@@ -88,9 +90,26 @@
                 <img id="navLogo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" class="header-logo" alt="">
                 <h1 class="h6 fw-bold mb-0 text-white" id="navCompanyName">B-one</h1>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
+            
+            <div class="ms-auto d-flex align-items-center">
+                <div class="position-relative d-inline-block me-3" id="adminNotifGroup" style="display:none !important;">
+                    <button class="btn btn-light rounded-circle shadow-sm" data-bs-toggle="dropdown">
+                        <i class="bi bi-bell-fill text-purple"></i>
+                        <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" id="notifList" style="width: 300px; max-height: 400px; overflow-y: auto;">
+                        <li class="dropdown-header">Derniers mouvements</li>
+                        <div id="notifItems"></div>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button onclick="clearAllNotifs()" class="dropdown-item text-center text-danger fw-bold">Supprimer l'historique (Code requis)</button></li>
+                    </ul>
+                </div>
+
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+            </div>
+
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
@@ -266,15 +285,60 @@
     </div>
 </main>
 
+<script type="module">
+    import { db, ref, onValue, remove } from './firebase-config.js';
+    
+    const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+    if(session && session.role === 'admin') {
+        document.getElementById('adminNotifGroup').style.display = 'inline-block';
+        
+        onValue(ref(db, 'notifications'), (snapshot) => {
+            const data = snapshot.val();
+            const badge = document.getElementById('notifBadge');
+            const container = document.getElementById('notifItems');
+            container.innerHTML = '';
+            
+            if(data) {
+                const list = Object.entries(data).reverse();
+                const unreadCount = list.filter(n => !n[1].read).length;
+                
+                badge.innerText = unreadCount;
+                badge.style.display = unreadCount > 0 ? 'block' : 'none';
+
+                list.forEach(([id, notif]) => {
+                    container.innerHTML += `
+                        <li class="p-2 border-bottom">
+                            <small class="text-muted">${new Date(notif.timestamp).toLocaleString()}</small><br>
+                            <strong>${notif.user}</strong>: ${notif.type}<br>
+                            <span class="text-secondary small">${JSON.stringify(notif.details)}</span>
+                        </li>`;
+                });
+            } else {
+                container.innerHTML = '<li class="p-3 text-center text-muted">Aucun mouvement</li>';
+                badge.style.display = 'none';
+            }
+        });
+    }
+
+    window.clearAllNotifs = () => {
+        const code = prompt("Entrez le code Admin pour supprimer l'historique :");
+        if(code === "1234") { 
+            remove(ref(db, 'notifications'));
+            alert("Historique vidé !");
+        } else {
+            alert("Code incorrect !");
+        }
+    };
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Logique d'enregistrement PWA
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('B-ONE SW enregistré !'))
-                .catch(err => console.error('Erreur SW:', err));
-        });
+    // Vérification stricte Admin
+    const sessionLocal = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+
+    if (!sessionLocal || sessionLocal.role !== 'admin') {
+        alert("Accès refusé. Seul l'administrateur peut accéder à cette page.");
+        window.location.href = 'login.html';
     }
 
     const STORAGE_KEY = 'BONE_OFFICIAL_CONFIG_V2';
@@ -282,7 +346,6 @@
     const FLUX_KEY = 'BONE_FINANCE_FLUX'; 
     const DB_KEY = 'BONE_PRODUCTS_LIST'; 
 
-    let userOrders = [];
     let financeFlux = JSON.parse(localStorage.getItem(FLUX_KEY)) || [];
     let myChart = null;
 
@@ -346,17 +409,11 @@
             this.renderAccounting();
         },
 
-        // Fonction mise à jour avec Cloud Sync
         deleteWithdraw(id) {
             if(confirm("Supprimer cette opération financière ?")) {
                 financeFlux = financeFlux.filter(f => f.id !== id);
                 localStorage.setItem(FLUX_KEY, JSON.stringify(financeFlux));
                 this.renderAccounting();
-                
-                // Suppression Cloud
-                if(window.SyncManager) {
-                    window.SyncManager.deleteItem('BONE_FINANCE_FLUX', id);
-                }
             }
         },
 
@@ -367,7 +424,7 @@
         },
 
         renderAccounting() {
-            userOrders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
+            const userOrders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
             const catalog = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             
             const period = document.getElementById('periodFilter').value;
@@ -398,7 +455,8 @@
             });
 
             table.innerHTML = filteredOrders.map((order) => {
-                const productInCatalog = catalog.find(p => p.name === order.prodName);
+                const productInCatalog = catalog.find(p => p.id === order.prodId || p.name === order.prodName);
+                
                 let unitAcquisition = 0;
                 if (order.acquisitionPrice && parseFloat(order.acquisitionPrice) > 0) {
                     unitAcquisition = parseFloat(order.acquisitionPrice);
@@ -408,18 +466,19 @@
                     unitAcquisition = parseFloat(order.rawPrice);
                 }
 
-                const quantity = parseInt(order.qty) || 1;
-                const acq = unitAcquisition * quantity;
-                const payedAmount = (order.isPricePayed ? (parseFloat(order.price)||0) : 0) + 
+                const quantity = parseInt(order.qty || order.quantity) || 1;
+                const acqTotal = unitAcquisition * quantity;
+
+                const payedAmount = ((order.isPricePayed ? (parseFloat(order.price)||0) : 0) + 
                                   (order.isTransitPayed ? (parseFloat(order.transit)||0) : 0) + 
                                   (order.isDouanePayed ? (parseFloat(order.douane)||0) : 0) + 
-                                  (order.isLivraisonPayed ? (parseFloat(order.livraison)||0) : 0);
+                                  (order.isLivraisonPayed ? (parseFloat(order.livraison)||0) : 0)) * quantity;
 
-                const growth = acq * growthRate;
-                const profit = payedAmount - acq - growth;
+                const growth = acqTotal * growthRate;
+                const profit = payedAmount - acqTotal - growth;
 
                 stats.sales += payedAmount; 
-                stats.acq += acq; 
+                stats.acq += acqTotal; 
                 stats.growth += growth; 
                 stats.gross += profit;
 
@@ -432,7 +491,7 @@
                     <td><div class="fw-bold">${order.prodName}</div><div class="text-muted small">${order.client} (Qté: ${quantity})</div></td>
                     <td class="text-center fw-bold">${payedAmount.toLocaleString()}</td>
                     <td class="text-center">
-                        <input type="number" class="input-acquisition" value="${acq}" readonly>
+                        <input type="number" class="input-acquisition" value="${acqTotal}" readonly>
                     </td>
                     <td class="text-center text-info fw-bold">${Math.round(growth).toLocaleString()}</td>
                     <td class="text-end ${profit >= 0 ? 'benefit-positive' : 'benefit-negative'}">${Math.round(profit).toLocaleString()}</td>
@@ -465,8 +524,8 @@
                 </tr>`;
             }).join('');
 
-            document.getElementById('totalSales').innerText = `${stats.sales.toLocaleString()} F`;
-            document.getElementById('totalCapitalStock').innerText = `${stats.acq.toLocaleString()} F`;
+            document.getElementById('totalSales').innerText = `${Math.round(stats.sales).toLocaleString()} F`;
+            document.getElementById('totalCapitalStock').innerText = `${Math.round(stats.acq).toLocaleString()} F`;
             document.getElementById('totalGrowthSaving').innerText = `${Math.round(stats.growth).toLocaleString()} F`;
             document.getElementById('totalGrossProfit').innerText = `${Math.round(stats.gross).toLocaleString()} F`;
             document.getElementById('totalWithdrawProfit').innerText = `-${stats.outProfit.toLocaleString()} F`;
@@ -510,7 +569,18 @@
     };
 
     window.onload = () => Finance.init();
+
+    function logout() {
+        if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
+            localStorage.removeItem('BONE_USER_SESSION');
+            window.location.href = 'login.html';
+        }
+    }
 </script>
-<script src="google-sheets-sync.js"></script>
+
+<button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
+    <i class="bi bi-power fs-4"></i>
+</button>
+
 </body>
 </html>
