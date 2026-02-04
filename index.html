@@ -26,7 +26,6 @@
         
         body { background-color: #f4f7f6; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
         
-        /* Header Premium & Navbar */
         .app-header { 
             background: var(--canva-gradient); 
             color: white; 
@@ -43,7 +42,8 @@
         .app-brand { font-size: 1.8rem; letter-spacing: 1px; }
         .promoter-name-nav { font-size: 0.85rem; opacity: 0.9; font-weight: 500; }
 
-        /* Menu Grid Style Android */
+        .text-purple { color: var(--canva-purple); }
+
         .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; padding: 20px; margin-top: -40px; }
         
         .menu-card { 
@@ -83,7 +83,6 @@
             padding: 2px 8px; border-radius: 10px; font-weight: bold;
         }
 
-        /* Nouveau: Produit Phare & Graphique */
         .featured-card { 
             background: white; border-radius: 24px; padding: 20px; 
             margin: 20px; box-shadow: 0 8px 25px rgba(0,0,0,0.05);
@@ -92,13 +91,6 @@
         .chart-container { height: 250px; position: relative; }
 
         .promoter-footer { text-align: center; padding: 20px; color: #aaa; font-size: 0.8rem; }
-
-        /* Styles Notification - Raffiné */
-        .notif-card {
-            border: none; border-radius: 15px; margin-bottom: 10px;
-            transition: all 0.3s ease; border-left: 5px solid transparent;
-        }
-        .notif-unread { border-left-color: var(--canva-purple); background: #f8f0ff; }
     </style>
 </head>
 <body>
@@ -113,9 +105,26 @@
                     <span class="promoter-name-nav" id="navPromoterName">ASSAÏ Boni Awé Didier</span>
                 </div>
             </div>
-            <button class="navbar-toggler border-white" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
-                <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
-            </button>
+
+            <div class="ms-auto d-flex align-items-center">
+                <div class="position-relative d-inline-block me-3" id="adminNotifGroup" style="display:none !important;">
+                    <button class="btn btn-light rounded-circle shadow-sm" data-bs-toggle="dropdown">
+                        <i class="bi bi-bell-fill text-purple"></i>
+                        <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" id="notifList" style="width: 300px; max-height: 400px; overflow-y: auto;">
+                        <li class="dropdown-header">Synchronisation Cloud</li>
+                        <div id="notifItems">
+                            <li class="p-3 text-center text-muted small"><i class="bi bi-cloud-check"></i> Temps réel activé</li>
+                        </div>
+                    </ul>
+                </div>
+
+                <button class="navbar-toggler border-white" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                    <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
+                </button>
+            </div>
+
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto text-end">
                     <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
@@ -171,144 +180,92 @@
     </div>
 </main>
 
-<div id="adminNotifyBtn" class="position-fixed bottom-0 start-0 m-3 d-none" style="z-index: 2001;">
-    <button class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center" 
-            style="width: 60px; height: 60px; background: var(--canva-gradient); border: 2px solid white;"
-            onclick="AdminNotif.openModal()">
-        <i class="bi bi-bell-fill fs-4"></i>
-        <span id="notifCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">
-            0
-        </span>
-    </button>
-</div>
-
-<div class="modal fade" id="notifModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 25px;">
-            <div class="modal-header border-0 text-white" style="background: var(--canva-gradient); border-radius: 25px 25px 0 0;">
-                <h5 class="modal-title fw-bold"><i class="bi bi-activity me-2"></i>Flux des Commandes & Mouvements</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="d-flex gap-2 mb-3">
-                    <div class="input-group">
-                        <span class="input-group-text bg-light border-0"><i class="bi bi-person-search"></i></span>
-                        <input type="text" id="notifFilter" class="form-control bg-light border-0 rounded-end" placeholder="Filtrer par utilisateur..." oninput="AdminNotif.renderList()">
-                    </div>
-                    <button class="btn btn-danger btn-sm rounded-pill px-3" onclick="AdminNotif.clearHistory()" style="white-space:nowrap;">Réinitialiser</button>
-                </div>
-                <div id="notifList" style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
-                    </div>
-            </div>
-            <div class="modal-footer border-0">
-                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Fermer</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, onValue, update, remove, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    // Configuration Firebase
-    const firebaseConfig = {  
-        apiKey: "AIzaSyCaLdUMDuWSfg7118-ZFpL1fARkM_BQ2zw",  
-        authDomain: "b-one-database.firebaseapp.com",  
-        projectId: "b-one-database",  
-        storageBucket: "b-one-database.firebasestorage.app",  
-        messagingSenderId: "423962812169",  
-        appId: "1:423962812169:web:34961a338fe06e693e7dd8",
-        databaseURL: "https://b-one-database-default-rtdb.firebaseio.com/"
+    const firebaseConfig = {
+        apiKey: "AIzaSyB4Ov3DGVvFuR9c1EGA8Gt-KOsZRLJlQXc",
+        authDomain: "gestion-importation-et-vente.firebaseapp.com",
+        databaseURL: "https://gestion-importation-et-vente-default-rtdb.europe-west1.firebasedatabase.app/",
+        projectId: "gestion-importation-et-vente",
+        storageBucket: "gestion-importation-et-vente.firebasestorage.app",
+        messagingSenderId: "243102213554",
+        appId: "1:243102213554:web:64d745f547b5b59b8430ab"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+
+    const APP_PREFIX = 'BONE_'; 
+    const DB_PATH = 'data_sync/';
+
+    // --- 1. L'INTERCEPTEUR (Priorité Realtime Database) ---
+    const nativeSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, value) {
+        try {
+            nativeSetItem.apply(this, arguments);
+        } catch (e) {
+            console.warn("LocalStorage saturé.");
+        }
+
+        if (key.startsWith(APP_PREFIX)) {
+            const path = key.replace(APP_PREFIX, '');
+            const dbRef = ref(db, DB_PATH + path); 
+            try {
+                const data = JSON.parse(value);
+                set(dbRef, data);
+            } catch (e) {
+                set(dbRef, value);
+            }
+        }
+    };
+
+    // --- 2. LA SYNCHRO BIDIRECTIONNELLE ---
+    window.initCloudSync = function(refreshCallback) {
+        const dataRef = ref(db, DB_PATH);
+        onValue(dataRef, (snapshot) => {
+            const cloudData = snapshot.val();
+            if (!cloudData) return;
+
+            let hasChanged = false;
+            Object.keys(cloudData).forEach(path => {
+                const localKey = APP_PREFIX + path;
+                const cloudValueStr = (typeof cloudData[path] === 'object') 
+                                      ? JSON.stringify(cloudData[path]) 
+                                      : cloudData[path];
+                
+                if (localStorage.getItem(localKey) !== cloudValueStr) {
+                    nativeSetItem.call(localStorage, localKey, cloudValueStr);
+                    hasChanged = true;
+                }
+            });
+            
+            if (hasChanged && typeof refreshCallback === 'function') {
+                refreshCallback();
+            }
+        });
+    }
+
+    // Lancer la synchro et rafraîchir l'UI si nécessaire
+    window.initCloudSync(() => {
+        if (typeof initApp === 'function') initApp();
+    });
+</script>
+
+<script>
+    const sessionLocal = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+
+    if (!sessionLocal || sessionLocal.role !== 'admin') {
+        window.location.href = 'login.html';
+    }
 
     const CONFIG_KEY = 'BONE_OFFICIAL_CONFIG_V2';
     const PROD_KEY = 'BONE_PRODUCTS_LIST';
     const ORDER_KEY = 'BONE_ORDERS_HISTORY';
     let myChart = null;
 
-    // --- LOGIQUE NOTIFICATION ADMIN ---
-    window.AdminNotif = {
-        data: [],
-        init() {
-            const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
-            if (session && session.role === 'admin') {
-                document.getElementById('adminNotifyBtn').classList.remove('d-none');
-                this.listen();
-            }
-        },
-        listen() {
-            onValue(ref(db, 'notifications'), (snapshot) => {
-                const val = snapshot.val();
-                this.data = val ? Object.entries(val).map(([id, item]) => ({id, ...item})).reverse() : [];
-                
-                const unreadCount = this.data.filter(n => !n.read).length;
-                const badge = document.getElementById('notifCount');
-                badge.innerText = unreadCount;
-                badge.classList.toggle('d-none', unreadCount === 0);
-                
-                this.renderList();
-            });
-        },
-        renderList() {
-            const filter = document.getElementById('notifFilter').value.toLowerCase();
-            const container = document.getElementById('notifList');
-            
-            container.innerHTML = this.data
-                .filter(n => n.userId.toLowerCase().includes(filter))
-                .map(n => `
-                    <div class="card notif-card shadow-sm ${!n.read ? 'notif-unread' : ''}">
-                        <div class="card-body d-flex justify-content-between align-items-center p-3">
-                            <div>
-                                <div class="small fw-bold text-primary mb-1">ID Utilisateur: ${n.userId}</div>
-                                <div class="fw-bold text-dark">${n.details}</div>
-                                <div class="text-muted" style="font-size:0.75rem;">${new Date(n.timestamp).toLocaleString()}</div>
-                            </div>
-                            <div class="d-flex flex-column align-items-end gap-2">
-                                ${!n.read ? `<button class="btn btn-sm btn-primary rounded-pill px-3" style="font-size:0.7rem;" onclick="AdminNotif.markRead('${n.id}')">Marquer lu</button>` : '<i class="bi bi-check-all text-success"></i>'}
-                            </div>
-                        </div>
-                    </div>
-                `).join('') || '<div class="text-center py-4 text-muted">Aucun mouvement trouvé</div>';
-        },
-        markRead(id) {
-            update(ref(db, `notifications/${id}`), { read: true });
-        },
-        clearHistory() {
-            const code = prompt("Code admin requis pour supprimer l'historique :");
-            if (code === "0000") {
-                remove(ref(db, 'notifications'));
-            } else {
-                alert("Code incorrect");
-            }
-        },
-        openModal() {
-            new bootstrap.Modal(document.getElementById('notifModal')).show();
-        }
-    };
-
-    // --- LOGIQUE SYNCHRONISATION DONNÉES ---
-    function syncRealtime() {
-        // Sync Produits
-        onValue(ref(db, 'products'), (snapshot) => {
-            const products = snapshot.val() ? Object.values(snapshot.val()) : [];
-            localStorage.setItem(PROD_KEY, JSON.stringify(products));
-            initApp(); // Relance l'affichage local
-        });
-        
-        // Sync Commandes
-        onValue(ref(db, 'orders'), (snapshot) => {
-            const orders = snapshot.val() ? Object.values(snapshot.val()) : [];
-            localStorage.setItem(ORDER_KEY, JSON.stringify(orders));
-            initApp();
-        });
-    }
-
-    // --- FONCTION INIT ORIGINALE ---
-    window.initApp = function() {
+    function initApp() {
         const config = JSON.parse(localStorage.getItem(CONFIG_KEY)) || {};
         const products = JSON.parse(localStorage.getItem(PROD_KEY)) || [];
         const orders = JSON.parse(localStorage.getItem(ORDER_KEY)) || [];
@@ -330,29 +287,70 @@
         renderFeaturedProduct(orders, products);
 
         const filter = document.getElementById('chartFilter');
-        const currentSelection = filter.value;
-        filter.innerHTML = '<option value="all">Tous les produits</option>';
+        const currentOptions = Array.from(filter.options).map(o => o.value);
         const uniqueProds = [...new Set(orders.map(o => o.prodName))];
+        
         uniqueProds.forEach(name => {
-            const opt = document.createElement('option');
-            opt.value = name;
-            opt.innerText = name;
-            if(name === currentSelection) opt.selected = true;
-            filter.appendChild(opt);
+            if(!currentOptions.includes(name)) {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.innerText = name;
+                filter.appendChild(opt);
+            }
         });
 
         updateMarketChart();
+
+        if(sessionLocal.role === 'admin') {
+            document.getElementById('adminNotifGroup').style.display = 'inline-block';
+        }
     }
 
-    // Attacher les fonctions au scope global
-    window.updateMarketChart = function() {
+    function renderMenu(pCount, oCount, orders) {
+        const totalSales = orders.reduce((acc, curr) => acc + (parseFloat(curr.price) || 0), 0);
+        const menuItems = [
+            { label: "Produits", sub: `${pCount} articles`, icon: "bi-box", bg: "bg-boutique", link: "produits.html", count: pCount },
+            { label: "Commandes", sub: `${oCount} factures`, icon: "bi-cart", bg: "bg-panier", link: "panier.html", count: oCount },
+            { label: "Ventes", sub: `${totalSales.toLocaleString()} F`, icon: "bi-cash-coin", bg: "bg-stats", link: "panier.html", count: null }
+        ];
+
+        document.getElementById('menuGrid').innerHTML = menuItems.map(item => `
+            <a href="${item.link}" class="menu-card">
+                ${item.count ? `<span class="badge-count">${item.count}</span>` : ''}
+                <div class="icon-circle ${item.bg}"><i class="bi ${item.icon}"></i></div>
+                <span class="menu-label">${item.label}</span>
+                <span class="menu-sub">${item.sub}</span>
+            </a>`).join('');
+    }
+
+    function renderFeaturedProduct(orders, products) {
+        if(orders.length === 0) return;
+        
+        const counts = {};
+        orders.forEach(o => counts[o.prodName] = (counts[o.prodName] || 0) + 1);
+        const topProduct = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+        const prodData = products.find(p => p.name === topProduct) || {};
+
+        document.getElementById('phareContent').innerHTML = `
+            <img src="${prodData.img || 'https://via.placeholder.com/80'}" class="phare-img">
+            <div>
+                <h6 class="fw-bold mb-0">${topProduct}</h6>
+                <p class="small text-muted mb-0">${counts[topProduct]} ventes réalisées</p>
+                <span class="badge bg-success-subtle text-success mt-1">En forte demande</span>
+            </div>`;
+    }
+
+    function updateMarketChart() {
         const filterValue = document.getElementById('chartFilter').value;
         const orders = JSON.parse(localStorage.getItem(ORDER_KEY)) || [];
+        
         let filteredData = (filterValue === 'all') ? orders : orders.filter(o => o.prodName === filterValue);
+        
         const labels = filteredData.map((_, i) => `Vente ${i+1}`);
         const dataValues = filteredData.map(o => parseFloat(o.price) || 0);
 
         if (myChart) myChart.destroy();
+
         const ctx = document.getElementById('marketChart').getContext('2d');
         myChart = new Chart(ctx, {
             type: 'line',
@@ -380,73 +378,7 @@
         });
     }
 
-    function renderMenu(pCount, oCount, orders) {
-        const totalSales = orders.reduce((acc, curr) => acc + (parseFloat(curr.price) || 0), 0);
-        const menuItems = [
-            { label: "Produits", sub: `${pCount} articles`, icon: "bi-box", bg: "bg-boutique", link: "produits.html", count: pCount },
-            { label: "Commandes", sub: `${oCount} factures`, icon: "bi-cart", bg: "bg-panier", link: "panier.html", count: oCount },
-            { label: "Ventes", sub: `${totalSales.toLocaleString()} F`, icon: "bi-cash-coin", bg: "bg-stats", link: "panier.html", count: null }
-        ];
-
-        document.getElementById('menuGrid').innerHTML = menuItems.map(item => `
-            <a href="${item.link}" class="menu-card">
-                ${item.count ? `<span class="badge-count">${item.count}</span>` : ''}
-                <div class="icon-circle ${item.bg}"><i class="bi ${item.icon}"></i></div>
-                <span class="menu-label">${item.label}</span>
-                <span class="menu-sub">${item.sub}</span>
-            </a>`).join('');
-    }
-
-    function renderFeaturedProduct(orders, products) {
-        if(orders.length === 0) return;
-        const counts = {};
-        orders.forEach(o => counts[o.prodName] = (counts[o.prodName] || 0) + 1);
-        const topProduct = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
-        const prodData = products.find(p => p.name === topProduct) || {};
-        document.getElementById('phareContent').innerHTML = `
-            <img src="${prodData.img || 'https://via.placeholder.com/80'}" class="phare-img">
-            <div>
-                <h6 class="fw-bold mb-0">${topProduct}</h6>
-                <p class="small text-muted mb-0">${counts[topProduct]} ventes réalisées</p>
-                <span class="badge bg-success-subtle text-success mt-1">En forte demande</span>
-            </div>`;
-    }
-
-    window.onload = () => {
-        initApp();
-        syncRealtime();
-        AdminNotif.init();
-    };
-</script>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('Service Worker enregistré !'))
-        .catch(err => console.log('Erreur SW:', err));
-    });
-  }
-
-    let deferredPrompt;
-    const installArea = document.getElementById('installArea');
-    const installBtn = document.getElementById('installBtn');
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        installArea.style.display = 'block';
-
-        installBtn.addEventListener('click', () => {
-            installArea.style.display = 'none';
-            deferredPrompt.prompt();
-            deferredPrompt.userChoice.then((choiceResult) => {
-                deferredPrompt = null;
-            });
-        });
-    });
+    window.onload = initApp;
 
     function logout() {
         if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
@@ -455,6 +387,8 @@
         }
     }
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
     <i class="bi bi-power fs-4"></i>

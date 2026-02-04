@@ -124,21 +124,84 @@
     </div>
 </div>
 
-<script>
-    // Logique PWA : Enregistrement du Service Worker
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('PWA: Service Worker enregistré !'))
-                .catch(err => console.log('PWA: Erreur SW:', err));
-        });
-    }
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
+    const firebaseConfig = {
+        apiKey: "AIzaSyB4Ov3DGVvFuR9c1EGA8Gt-KOsZRLJlQXc",
+        authDomain: "gestion-importation-et-vente.firebaseapp.com",
+        databaseURL: "https://gestion-importation-et-vente-default-rtdb.europe-west1.firebasedatabase.app/",
+        projectId: "gestion-importation-et-vente",
+        storageBucket: "gestion-importation-et-vente.firebasestorage.app",
+        messagingSenderId: "243102213554",
+        appId: "1:243102213554:web:64d745f547b5b59b8430ab"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const APP_PREFIX = 'BONE_'; 
+    const DB_PATH = 'data_sync/';
+
+    // --- 1. L'INTERCEPTEUR (Surcharge du LocalStorage pour Firebase) ---
+    const nativeSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, value) {
+        try {
+            nativeSetItem.apply(this, arguments);
+        } catch (e) {
+            console.warn("LocalStorage saturé, persistance Cloud uniquement.");
+        }
+
+        if (key.startsWith(APP_PREFIX)) {
+            const path = key.replace(APP_PREFIX, '');
+            const dbRef = ref(db, DB_PATH + path); 
+            try {
+                const data = JSON.parse(value);
+                set(dbRef, data);
+            } catch (e) {
+                set(dbRef, value);
+            }
+        }
+    };
+
+    // --- 2. LA SYNCHRO BIDIRECTIONNELLE ---
+    window.initCloudSync = function(refreshCallback) {
+        const dataRef = ref(db, DB_PATH);
+        onValue(dataRef, (snapshot) => {
+            const cloudData = snapshot.val();
+            if (!cloudData) return;
+
+            let hasChanged = false;
+            Object.keys(cloudData).forEach(path => {
+                const localKey = APP_PREFIX + path;
+                const cloudValueStr = (typeof cloudData[path] === 'object') 
+                                      ? JSON.stringify(cloudData[path]) 
+                                      : cloudData[path];
+                
+                if (localStorage.getItem(localKey) !== cloudValueStr) {
+                    nativeSetItem.call(localStorage, localKey, cloudValueStr);
+                    hasChanged = true;
+                }
+            });
+            
+            if (hasChanged && typeof refreshCallback === 'function') {
+                refreshCallback();
+            }
+        });
+    };
+
+    // Initialisation globale
+    window.initCloudSync(() => {
+        if(typeof init === 'function') init();
+    });
+</script>
+
+<script>
     // Configuration initiale
     const USERS_DB_KEY = 'BONE_USERS_ACCOUNTS';
     const SESSION_KEY = 'BONE_USER_SESSION';
 
-    // Données par défaut réinitialisées (PDG + 4 Utilisateurs)
     const defaultUsers = {
         "PDG": { password: "Admin2025", role: "admin" },
         "Utilisateur 1": { password: "User001", role: "user" },
@@ -147,16 +210,16 @@
         "Utilisateur 4": { password: "User004", role: "user" }
     };
 
-    let users = JSON.parse(localStorage.getItem(USERS_DB_KEY)) || defaultUsers;
+    let users = {};
 
     function init() {
+        users = JSON.parse(localStorage.getItem(USERS_DB_KEY)) || defaultUsers;
         const select = document.getElementById('userListOptions');
         const manageList = document.getElementById('usersListManage');
         select.innerHTML = '';
         manageList.innerHTML = '<p class="fw-bold small border-bottom pb-1">Liste des accès :</p>';
 
         Object.keys(users).forEach(name => {
-            // Remplissage du select de login
             if(name !== 'PDG') {
                 const opt = document.createElement('option');
                 opt.value = name;
@@ -164,7 +227,6 @@
                 select.appendChild(opt);
             }
 
-            // Remplissage de la liste de gestion (Admin)
             const item = document.createElement('div');
             item.className = 'user-item';
             item.innerHTML = `
@@ -178,7 +240,6 @@
         });
     }
 
-    // Gestion du Login
     document.getElementById('loginForm').addEventListener('submit', (e) => {
         e.preventDefault();
         const role = document.getElementById('userRole').value;
@@ -199,11 +260,7 @@
             overlay.style.display = 'flex';
 
             setTimeout(() => {
-                if (users[role].role === 'admin') {
-                    window.location.href = 'index.html';
-                } else {
-                    window.location.href = 'produits.html';
-                }
+                window.location.href = (users[role].role === 'admin') ? 'index.html' : 'produits.html';
             }, 1500);
 
         } else {
@@ -212,10 +269,8 @@
         }
     });
 
-    // Fonctions Administrateur
     function toggleAdminPanel() {
-        const panel = document.getElementById('adminPanel');
-        panel.classList.toggle('hidden');
+        document.getElementById('adminPanel').classList.toggle('hidden');
     }
 
     function unlockUserManagement() {
@@ -235,16 +290,15 @@
 
         if(!name || !pass) return alert("Veuillez remplir tous les champs");
 
-        // Le PDG reste toujours Admin, pour les autres on utilise le rôle sélectionné
         const finalRole = (name === 'PDG') ? 'admin' : role;
-        
         users[name] = { password: pass, role: finalRole };
+        
+        // Cette ligne déclenche l'envoi vers Firebase via l'intercepteur
         localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
         
-        alert(`Utilisateur ${name} (${finalRole}) enregistré/modifié avec succès !`);
+        alert(`Utilisateur ${name} enregistré avec succès !`);
         document.getElementById('newUserName').value = '';
         document.getElementById('newUserPass').value = '';
-        document.getElementById('newUserRole').value = 'user';
         init();
     }
 
@@ -263,15 +317,18 @@
         }
     }
 
-    function logout() {
-        localStorage.removeItem(SESSION_KEY);
-        window.location.href = 'login.html';
-    }
+    window.compressImage = function(videoId) {
+        const video = document.getElementById(videoId);
+        const canvas = document.createElement('canvas');
+        canvas.width = 300; 
+        canvas.height = 300; 
+        canvas.getContext('2d').drawImage(video, 0, 0, 300, 300);
+        return canvas.toDataURL('image/jpeg', 0.6);
+    };
 
     window.onload = init;
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="google-sheets-sync.js"></script>
 </body>
 </html>

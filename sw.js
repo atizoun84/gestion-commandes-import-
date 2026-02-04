@@ -1,7 +1,16 @@
+// 
 const CACHE_NAME = 'v1_atizoun_cache';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
+  '/login.html',
+  '/produits.html',
+  '/panier.html',
+  '/paiement.html',
+  '/comptabilite.html',
+  '/configuration.html',
+  '/maintenance.html',
+  '/firebase-config.js',
   '/logoapp.png',
   '/manifest.json'
 ];

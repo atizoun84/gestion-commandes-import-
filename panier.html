@@ -68,6 +68,8 @@
         /* Nouveau Print Area Style */
         #printArea { display: none; }
 
+        .text-purple { color: var(--canva-purple) !important; }
+
         @media print {
             body * { visibility: hidden; }
             #printArea, #printArea * { visibility: visible; }
@@ -89,6 +91,90 @@
 </head>
 <body>
 
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyB4Ov3DGVvFuR9c1EGA8Gt-KOsZRLJlQXc",
+        authDomain: "gestion-importation-et-vente.firebaseapp.com",
+        databaseURL: "https://gestion-importation-et-vente-default-rtdb.europe-west1.firebasedatabase.app/",
+        projectId: "gestion-importation-et-vente",
+        storageBucket: "gestion-importation-et-vente.firebasestorage.app",
+        messagingSenderId: "243102213554",
+        appId: "1:243102213554:web:64d745f547b5b59b8430ab"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const APP_PREFIX = 'BONE_'; 
+    const DB_PATH = 'data_sync/';
+
+    // --- 1. L'INTERCEPTEUR (Priorité Realtime) ---
+    const nativeSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, value) {
+        try {
+            nativeSetItem.apply(this, arguments);
+        } catch (e) {
+            console.warn("LocalStorage saturé.");
+        }
+
+        if (key.startsWith(APP_PREFIX)) {
+            const path = key.replace(APP_PREFIX, '');
+            const dbRef = ref(db, DB_PATH + path); 
+            try {
+                const data = JSON.parse(value);
+                set(dbRef, data);
+            } catch (e) {
+                set(dbRef, value);
+            }
+        }
+    };
+
+    // --- 2. LA SYNCHRO BIDIRECTIONNELLE ---
+    window.initCloudSync = function(refreshCallback) {
+        const dataRef = ref(db, DB_PATH);
+        onValue(dataRef, (snapshot) => {
+            const cloudData = snapshot.val();
+            if (!cloudData) return;
+
+            let hasChanged = false;
+            Object.keys(cloudData).forEach(path => {
+                const localKey = APP_PREFIX + path;
+                const cloudValueStr = (typeof cloudData[path] === 'object') 
+                                      ? JSON.stringify(cloudData[path]) 
+                                      : cloudData[path];
+                
+                if (localStorage.getItem(localKey) !== cloudValueStr) {
+                    nativeSetItem.call(localStorage, localKey, cloudValueStr);
+                    hasChanged = true;
+                }
+            });
+            
+            if (hasChanged && typeof refreshCallback === 'function') {
+                refreshCallback();
+            }
+        });
+    }
+
+    // Initialisation
+    window.initCloudSync(() => {
+        if(window.CartManager && typeof window.CartManager.renderOrders === 'function') {
+            window.CartManager.renderOrders();
+        }
+    });
+
+    window.compressImage = function(videoId) {
+        const video = document.getElementById(videoId);
+        const canvas = document.createElement('canvas');
+        canvas.width = 300;
+        canvas.height = 300; 
+        canvas.getContext('2d').drawImage(video, 0, 0, 300, 300);
+        return canvas.toDataURL('image/jpeg', 0.6);
+    };
+</script>
+
 <header class="app-header shadow-lg no-print">
     <nav class="navbar navbar-expand-lg navbar-dark p-3">
         <div class="container px-0">
@@ -99,9 +185,24 @@
                     <small class="opacity-75" style="font-size: 0.65rem;">Suivi des Commandes</small>
                 </div>
             </div>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
-                <i class="bi bi-list fs-2"></i>
-            </button>
+
+            <div class="ms-auto d-flex align-items-center">
+                <div class="position-relative d-inline-block me-3" id="adminNotifGroup" style="display:none !important;">
+                    <button class="btn btn-light rounded-circle shadow-sm" data-bs-toggle="dropdown">
+                        <i class="bi bi-bell-fill text-purple"></i>
+                        <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none;">0</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0" id="notifList" style="width: 300px; max-height: 400px; overflow-y: auto;">
+                        <li class="dropdown-header">Derniers mouvements</li>
+                        <div id="notifItems"></div>
+                    </ul>
+                </div>
+
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                    <i class="bi bi-list fs-2"></i>
+                </button>
+            </div>
+
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
                     <li class="nav-item"><a class="nav-link" href="index.html">Accueil</a></li>
@@ -183,39 +284,6 @@
     </div>
 </main>
 
-<div id="adminNotifyBtn" class="position-fixed bottom-0 start-0 m-3 d-none" style="z-index: 2001;">
-    <button class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center" 
-            style="width: 60px; height: 60px; background: var(--canva-gradient); border: 2px solid white;"
-            onclick="AdminNotif.openModal()">
-        <i class="bi bi-bell-fill fs-4"></i>
-        <span id="notifCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
-    </button>
-</div>
-
-<div class="modal fade" id="notifModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
-            <div class="modal-header border-0 text-white" style="background: var(--canva-gradient); border-radius: 20px 20px 0 0;">
-                <h5 class="modal-title fw-bold"><i class="bi bi-lightning-charge-fill me-2"></i>Mouvements Récents</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <div class="input-group mb-3">
-                    <span class="input-group-text bg-white border-end-0 rounded-start-pill"><i class="bi bi-search text-muted"></i></span>
-                    <input type="text" id="notifFilter" class="form-control border-start-0 rounded-end-pill" placeholder="Filtrer par utilisateur..." oninput="AdminNotif.render()">
-                </div>
-                <div id="notifList" style="max-height: 400px; overflow-y: auto;"></div>
-            </div>
-            <div class="modal-footer border-0 d-flex justify-content-between">
-                <button class="btn btn-outline-danger btn-sm rounded-pill" onclick="AdminNotif.clearHistory()">
-                    <i class="bi bi-trash3 me-1"></i>Réinitialiser (Admin)
-                </button>
-                <button class="btn btn-secondary btn-sm rounded-pill" data-bs-dismiss="modal">Fermer</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <div id="printArea">
     <div style="text-align: center; border-bottom: 2px solid #000; margin-bottom: 20px; padding-bottom: 10px;">
         <h2 id="printTitle" style="margin: 0;"></h2>
@@ -236,7 +304,7 @@
             <div class="recap-header">
                 <h5 class="fw-bold mb-0"><i class="bi bi-collection me-2"></i>Point de Vente Détaillé</h5>
                 <small>Décomposition des paiements et restes par poste</small>
-                <button type="button" class="btn-close btn-close-white position-absolute end-0 top-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white position-absolute end-0 top-0 m-3" data-bs-toggle="modal" aria-label="Close"></button>
             </div>
             <div class="recap-body">
                 <div class="row g-3 mb-4">
@@ -277,88 +345,6 @@
     </div>
 </footer>
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, set, onValue, push, update, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
-    const firebaseConfig = {  
-        apiKey: "AIzaSyCaLdUMDuWSfg7118-ZFpL1fARkM_BQ2zw",  
-        authDomain: "b-one-database.firebaseapp.com",  
-        projectId: "b-one-database",  
-        storageBucket: "b-one-database.firebasestorage.app",  
-        messagingSenderId: "423962812169",  
-        appId: "1:423962812169:web:34961a338fe06e693e7dd8",
-        databaseURL: "https://b-one-database-default-rtdb.firebaseio.com/"
-    };  
-    
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-
-    // --- SYNCHRONISATION INITIALE ---
-    onValue(ref(db, 'orders'), (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-            const ordersList = Object.entries(data).map(([id, val]) => ({ id, ...val }));
-            localStorage.setItem('BONE_ORDERS_HISTORY', JSON.stringify(ordersList));
-            CartManager.renderOrders();
-        }
-    });
-
-    // --- SYSTEME DE NOTIFICATION ADMIN ---
-    window.AdminNotif = {
-        allNotifs: [],
-        init() {
-            const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
-            if (session && session.role === 'admin') {
-                document.getElementById('adminNotifyBtn').classList.remove('d-none');
-                this.listen();
-            }
-        },
-        listen() {
-            onValue(ref(db, 'notifications'), (snapshot) => {
-                const data = snapshot.val();
-                this.allNotifs = data ? Object.entries(data).map(([id, val]) => ({id, ...val})).reverse() : [];
-                const unread = this.allNotifs.filter(n => !n.read).length;
-                const badge = document.getElementById('notifCount');
-                badge.innerText = unread;
-                badge.classList.toggle('d-none', unread === 0);
-                this.render();
-            });
-        },
-        render() {
-            const container = document.getElementById('notifList');
-            const filter = document.getElementById('notifFilter').value.toLowerCase();
-            container.innerHTML = this.allNotifs
-                .filter(n => n.userId.toLowerCase().includes(filter))
-                .map(n => `
-                    <div class="card mb-2 border-0 shadow-sm ${n.read ? 'opacity-75' : 'border-start border-primary border-4'}">
-                        <div class="card-body p-3 d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-0 fw-bold">${n.details}</h6>
-                                <small class="text-muted">Par: <b>${n.userId}</b> • ${new Date(n.timestamp).toLocaleString()}</small>
-                            </div>
-                            ${!n.read ? `<button class="btn btn-sm btn-primary rounded-pill" onclick="AdminNotif.markRead('${n.id}')">Lu</button>` : '<i class="bi bi-check-all text-success fs-4"></i>'}
-                        </div>
-                    </div>
-                `).join('') || '<p class="text-center text-muted">Rien à signaler</p>';
-        },
-        markRead(id) { update(ref(db, `notifications/${id}`), { read: true }); },
-        clearHistory() {
-            if (prompt("Code Admin ?") === "0000") {
-                remove(ref(db, 'notifications'));
-            }
-        },
-        openModal() { new bootstrap.Modal(document.getElementById('notifModal')).show(); }
-    };
-
-    window.AdminNotif.init();
-    
-    // Rendre les fonctions accessibles globalement
-    window.db = db;
-    window.ref = ref;
-    window.push = push;
-</script>
-
 <script>
     const ORDERS_KEY = 'BONE_ORDERS_HISTORY';
     const DB_KEY = 'BONE_PRODUCTS_LIST';
@@ -372,6 +358,11 @@
             this.loadConfig();
             this.products = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             this.renderOrders();
+            
+            const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
+            if(session && session.role === 'admin') {
+                document.getElementById('adminNotifGroup').style.setProperty('display', 'inline-block', 'important');
+            }
         },
 
         loadConfig() {
@@ -417,7 +408,6 @@
                 
                 const img = productFromDB.img || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
                 const qte = parseInt(order.quantity || order.qty) || 1;
-
                 const vBase = parseFloat(order.price) || 0;
                 const tPrice = parseFloat(order.transit) || 0;
                 const dPrice = parseFloat(order.douane) || 0;
@@ -513,7 +503,6 @@
             if(productName === "") { preview.innerText = "Sélectionnez un produit et une vague..."; return; }
             
             const config = JSON.parse(localStorage.getItem(CONFIG_KEY)) || {};
-            const productDB = this.products.find(p => p.name === productName && (p.currentWave == wave || !p.currentWave)) || {};
             const clientOrders = this.orders.filter(o => o.prodName === productName && (o.wave == wave || (!o.wave && wave == 1)));
             
             let totalGlobal = 0, totalPayeGlobal = 0, totalQte = 0;
@@ -525,17 +514,13 @@
                 const tPrice = parseFloat(o.transit) || 0;
                 const dPrice = parseFloat(o.douane) || 0;
                 const lPrice = parseFloat(o.livraison) || 0;
-                
                 const unitTotal = vBase + tPrice + dPrice + lPrice;
                 const globalTotal = unitTotal * qte;
-                
                 let payed = 0;
                 if(o.isPricePayed) payed += (vBase * qte);
                 if(o.isTransitPayed) payed += (tPrice * qte);
                 if(o.isDouanePayed) payed += (dPrice * qte);
                 if(o.isLivraisonPayed) payed += (lPrice * qte);
-
-                const totalRest = globalTotal - payed;
                 totalGlobal += globalTotal;
                 totalPayeGlobal += payed;
                 totalQte += qte;
@@ -545,20 +530,13 @@
                               `   🚢 Transit: ${o.isTransitPayed ? tPrice.toLocaleString() : '0'} F [${o.isTransitPayed ? '✅' : '❌'}]\n` +
                               `   🛃 Douane: ${o.isDouanePayed ? dPrice.toLocaleString() : '0'} F [${o.isDouanePayed ? '✅' : '❌'}]\n` +
                               `   🚚 Livr: ${o.isLivraisonPayed ? lPrice.toLocaleString() : '0'} F [${o.isLivraisonPayed ? '✅' : '❌'}]\n` +
-                              `   --------------------------\n` +
                               `   💵 TOTAL: ${globalTotal.toLocaleString()} F | ✅ PAYÉ: ${payed.toLocaleString()} F\n` +
-                              `   🛑 RESTE: ${totalRest.toLocaleString()} F\n` +
+                              `   🛑 RESTE: ${(globalTotal - payed).toLocaleString()} F\n` +
                               `   __________________________\n\n`;
             });
 
-            const minQty = parseInt(productDB.minQty || clientOrders[0]?.minOrderRequired) || 0;
-            const resteQte = Math.max(0, minQty - totalQte);
-            const vagueStatus = totalQte >= minQty ? "✅ COMMANDE BOUCLÉE POUR CETTE VAGUE" : "⏳ COMMANDE EN COURS POUR CETTE VAGUE";
-
             const msg = `*POINT PAR PRODUIT : ${productName} (VAGUE ${wave})*\n` +
                 `🏢 *ENTREPRISE :* ${config.companyName || 'MT & B-One'}\n` +
-                `📢 *STATUT : ${vagueStatus}*\n` +
-                `📦 *ÉTAT DES QUANTITÉS :* ${totalQte} / ${minQty} (Min requis: ${minQty}, Manque: ${resteQte})\n` +
                 `----------------------------------\n` +
                 detailText +
                 `📊 *BILAN GLOBAL*\n` +
@@ -575,15 +553,12 @@
         copyAllOrdersRecap() {
             const config = JSON.parse(localStorage.getItem(CONFIG_KEY)) || {};
             if(this.orders.length === 0) return alert("Aucune commande à copier.");
-
             const availableWaves = [...new Set(this.orders.map(o => o.wave || 1))].sort((a,b) => b-a);
-            const selectedWave = prompt(`Choisissez le numéro de vague pour le rapport global (Vagues dispo: ${availableWaves.join(', ')})`, availableWaves[0]);
-            
+            const selectedWave = prompt(`Vague pour rapport global:`, availableWaves[0]);
             if(!selectedWave) return;
             const waveNum = parseInt(selectedWave);
-
             const filteredOrders = this.orders.filter(o => (o.wave || 1) == waveNum);
-            if(filteredOrders.length === 0) return alert("Aucune commande trouvée pour cette vague.");
+            if(filteredOrders.length === 0) return alert("Aucune commande pour cette vague.");
 
             const grouped = filteredOrders.reduce((acc, order) => {
                 if (!acc[order.prodName]) acc[order.prodName] = [];
@@ -594,63 +569,32 @@
             let finalMsg = `*RÉCAPITULATIF GÉNÉRAL DES VENTES (VAGUE ${waveNum})*\n🏢 *${config.companyName || 'MT & B-One'}*\n📅 Date : ${new Date().toLocaleDateString('fr-FR')}\n\n`;
 
             for (const productName in grouped) {
-                const productDB = this.products.find(p => p.name === productName && (p.currentWave == waveNum || !p.currentWave)) || {};
-                let totalProdValue = 0;
-                let totalProdPayed = 0;
-                let totalProdQte = 0;
+                let totalProdValue = 0, totalProdPayed = 0, totalProdQte = 0;
                 let detailText = "";
-
                 grouped[productName].forEach((o, i) => {
                     const qte = parseInt(o.quantity || o.qty) || 1;
                     const vBase = parseFloat(o.price) || 0;
                     const tPrice = parseFloat(o.transit) || 0;
                     const dPrice = parseFloat(o.douane) || 0;
                     const lPrice = parseFloat(o.livraison) || 0;
-                    
                     const unitTotal = vBase + tPrice + dPrice + lPrice;
                     const globalTotal = unitTotal * qte;
-
                     let payed = 0;
                     if(o.isPricePayed) payed += (vBase * qte);
                     if(o.isTransitPayed) payed += (tPrice * qte);
                     if(o.isDouanePayed) payed += (dPrice * qte);
                     if(o.isLivraisonPayed) payed += (lPrice * qte);
-                    
-                    totalProdValue += globalTotal;
-                    totalProdPayed += payed;
-                    totalProdQte += qte;
+                    totalProdValue += globalTotal; totalProdPayed += payed; totalProdQte += qte;
 
                     detailText += `${i+1}. 👤 *${o.client}* (Qté: ${qte})\n` +
-                                  `   💰 Vente: ${o.isPricePayed ? vBase.toLocaleString() : '0'} F [${o.isPricePayed ? '✅' : '❌'}]\n` +
-                                  `   🚢 Transit: ${o.isTransitPayed ? tPrice.toLocaleString() : '0'} F [${o.isTransitPayed ? '✅' : '❌'}]\n` +
-                                  `   🛃 Douane: ${o.isDouanePayed ? dPrice.toLocaleString() : '0'} F [${o.isDouanePayed ? '✅' : '❌'}]\n` +
-                                  `   🚚 Livr: ${o.isLivraisonPayed ? lPrice.toLocaleString() : '0'} F [${o.isLivraisonPayed ? '✅' : '❌'}]\n` +
-                                  `   --------------------------\n` +
                                   `   💵 TOTAL: ${globalTotal.toLocaleString()} F | ✅ PAYÉ: ${payed.toLocaleString()} F\n` +
-                                  `   🛑 RESTE: ${(globalTotal - payed).toLocaleString()} F\n` +
-                                  `   __________________________\n\n`;
+                                  `   🛑 RESTE: ${(globalTotal - payed).toLocaleString()} F\n`;
                 });
-
-                const minQty = parseInt(productDB.minQty || grouped[productName][0]?.minOrderRequired) || 0;
-                const resteQte = Math.max(0, minQty - totalProdQte);
-                const vagueStatus = totalProdQte >= minQty ? "✅ COMMANDE BOUCLÉE POUR CETTE VAGUE" : "⏳ COMMANDE EN COURS POUR CETTE VAGUE";
-
-                finalMsg += `*POINT PAR PRODUIT : ${productName.toUpperCase()} (VAGUE ${waveNum})*\n` +
-                            `📢 *STATUT : ${vagueStatus}*\n` +
-                            `📦 *ÉTAT DES QUANTITÉS :* ${totalProdQte} / ${minQty} (Min requis: ${minQty}, Manque: ${resteQte})\n` +
-                            `----------------------------------\n` +
-                            detailText +
-                            `📊 *BILAN PRODUIT*\n` +
-                            `🔢 Qté Totale : ${totalProdQte}\n` +
-                            `💰 Valeur : ${totalProdValue.toLocaleString()} F CFA\n` +
-                            `💵 Encaissé : ${totalProdPayed.toLocaleString()} F CFA\n` +
-                            `🔥 *À PERCEVOIR : ${(totalProdValue - totalProdPayed).toLocaleString()} F CFA*\n` +
-                            `----------------------------------\n\n`;
+                finalMsg += `*PRODUIT : ${productName.toUpperCase()}*\n` + detailText +
+                            `📊 BILAN : ${totalProdValue.toLocaleString()} F (${totalProdPayed.toLocaleString()} encaissé)\n\n`;
             }
-
             finalMsg += `✍️ _Signé : ${config.ceoName || 'Le PDG'}_`;
-
-            navigator.clipboard.writeText(finalMsg).then(() => alert("Récapitulatif complet copié !"));
+            navigator.clipboard.writeText(finalMsg).then(() => alert("Copié !"));
         },
 
         copyAndCloseRecap() {
@@ -671,41 +615,24 @@
 
         deleteOrder(orderId) {
             if(confirm("Supprimer cette commande ?")) {
-                import("https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js").then(m => {
-                    m.remove(m.ref(window.db, `orders/${orderId}`));
-                });
+                this.orders = this.orders.filter(o => o.id !== orderId);
+                localStorage.setItem(ORDERS_KEY, JSON.stringify(this.orders));
+                this.renderOrders();
             }
         },
 
         clearOrders() {
             if(confirm("Voulez-vous vraiment vider tout l'historique ?")) {
-                import("https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js").then(m => {
-                    m.remove(m.ref(window.db, 'orders'));
-                });
+                localStorage.removeItem(ORDERS_KEY);
+                this.renderOrders();
+                alert("Historique vidé.");
             }
         }
     };
 
+    window.CartManager = CartManager;
     window.onload = () => CartManager.init();
-</script>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-                .then(reg => console.log('Service Worker enregistré !', reg.scope))
-                .catch(err => console.error('Erreur d\'enregistrement SW :', err));
-        });
-    }
-</script>
-
-<button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
-    <i class="bi bi-power fs-4"></i>
-</button>
-
-<script>
     function logout() {
         if (confirm("Atizoun, voulez-vous vraiment vous déconnecter de B-one ?")) {
             localStorage.removeItem('BONE_USER_SESSION');
@@ -713,6 +640,12 @@
         }
     }
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<button onclick="logout()" class="btn btn-danger position-fixed bottom-0 end-0 m-3 rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 55px; height: 55px; z-index: 2000; border: 2px solid white;">
+    <i class="bi bi-power fs-4"></i>
+</button>
 
 </body>
 </html>
