@@ -130,10 +130,10 @@
         <div class="icon-box bg-danger-soft mx-auto">
             <i class="bi bi-exclamation-triangle"></i>
         </div>
-        <h5 class="fw-bold text-danger">Réinitialisation</h5>
-        <p class="text-muted small">Efface définitivement toutes les données de ce téléphone.</p>
-        <button onclick="Maintenance.reset()" class="btn btn-outline-danger btn-custom w-100">
-            Effacer tout
+        <h5 class="fw-bold text-danger">Réinitialisation Cloud & Local</h5>
+        <p class="text-muted small">Efface définitivement toutes les données sur Firebase et sur ce téléphone.</p>
+        <button onclick="Maintenance.resetFullDatabase()" class="btn btn-outline-danger btn-custom w-100">
+            Tout supprimer (Cloud + Local)
         </button>
     </div>
 </main>
@@ -190,6 +190,29 @@
         }
     };
 
+    // --- FONCTION DE RÉINITIALISATION COMPLÈTE (CLOUD + LOCAL) ---
+    window.resetFullDatabase = async function() {
+        if (confirm("ATTENTION : Cela supprimera TOUTES les données sur Firebase et en local. Continuer ?")) {
+            // 1. Vider Firebase (le chemin data_sync)
+            const dbRef = ref(db, DB_PATH);
+            try {
+                await set(dbRef, null); 
+
+                // 2. Vider le LocalStorage (toutes les clés commençant par BONE_)
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith(APP_PREFIX)) {
+                        localStorage.removeItem(key);
+                    }
+                });
+
+                alert("Application réinitialisée avec succès !");
+                location.reload(); 
+            } catch (error) {
+                alert("Erreur lors de la suppression Cloud : " + error.message);
+            }
+        }
+    };
+
     // --- SYNCHRO FIREBASE -> LOCALSTORAGE ---
     window.initCloudSync = function(refreshCallback) {
         const dataRef = ref(db, DB_PATH);
@@ -214,16 +237,6 @@
                 refreshCallback();
             }
         });
-    };
-
-    // --- UTILITAIRE COMPRESSION IMAGE ---
-    window.compressImage = function(videoId) {
-        const video = document.getElementById(videoId);
-        const canvas = document.createElement('canvas');
-        canvas.width = 300;
-        canvas.height = 300; 
-        canvas.getContext('2d').drawImage(video, 0, 0, 300, 300);
-        return canvas.toDataURL('image/jpeg', 0.6);
     };
 
     // Initialisation
@@ -291,10 +304,19 @@
             }
         },
 
+        // Redirection vers la fonction Cloud globale définie dans le script type module
+        resetFullDatabase() {
+            if (typeof window.resetFullDatabase === 'function') {
+                window.resetFullDatabase();
+            } else {
+                alert("Le module de synchronisation n'est pas encore prêt.");
+            }
+        },
+
         reset() {
-            if (confirm("VOULEZ-VOUS VRAIMENT TOUT EFFACER ? Cette action est irréversible.")) {
+            if (confirm("VOULEZ-VOUS VRAIMENT TOUT EFFACER LOCALEMENT ? Cette action est irréversible.")) {
                 localStorage.clear();
-                alert("Système réinitialisé.");
+                alert("Système local réinitialisé.");
                 window.location.href = "configuration.html";
             }
         }
