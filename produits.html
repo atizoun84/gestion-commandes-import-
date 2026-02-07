@@ -422,6 +422,7 @@
                     <div class="mb-3 mt-2">
                         <label class="form-label small fw-bold">Image</label>
                         <input type="file" id="pImgFile" class="form-control rounded-pill" accept="image/*">
+                        <div id="compressingStatus" class="small text-info mt-1" style="display:none;"><i class="bi bi-hourglass-split"></i> Compression de l'image en cours...</div>
                         <input type="hidden" id="pImgBase64">
                     </div>
                     <button type="submit" id="btnSaveMain" class="btn btn-primary w-100 py-3 shadow rounded-pill fw-bold">ENREGISTRER</button>
@@ -483,7 +484,7 @@
     const DB_PATH = 'data_sync/';
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyB4Ov3DGVvFuR9c1EGA8Gt-KOsZRLJlQXc",
@@ -498,14 +499,12 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // --- 1. L'INTERCEPTEUR (Surcharge du LocalStorage) ---
     const nativeSetItem = localStorage.setItem;
-
     localStorage.setItem = function(key, value) {
         try {
             nativeSetItem.apply(this, arguments);
         } catch (e) {
-            console.warn("LocalStorage saturé, persistance Cloud uniquement.");
+            console.warn("LocalStorage saturé.");
         }
 
         if (key.startsWith(APP_PREFIX)) {
@@ -520,7 +519,6 @@
         }
     };
 
-    // --- 2. LA SYNCHRO BIDIRECTIONNELLE ---
     function initCloudSync(refreshCallback) {
         const dataRef = ref(db, DB_PATH);
         onValue(dataRef, (snapshot) => {
@@ -546,12 +544,11 @@
         });
     }
 
-    // --- LOGIQUE APPLICATION ---
     const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
     if (!session) window.location.href = 'login.html';
 
     function appliquerRestrictions() {
-        if (session.role === 'user') {
+        if (session && session.role === 'user') {
             const addBtn = document.querySelector('[data-bs-target="#addProductModal"], #addProductBtn, #btnFloatAdd');
             if (addBtn) addBtn.style.display = 'none';
 
@@ -574,10 +571,10 @@
     const SESSION_KEY = 'BONE_USER_SESSION';
     const ORDERS_KEY = 'BONE_ORDERS_HISTORY';
 
-    let products = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-    let categories = JSON.parse(localStorage.getItem(CAT_KEY)) || ['Énergie', 'Audio', 'Mobilité'];
-    let origins = JSON.parse(localStorage.getItem(ORIGIN_KEY)) || ['Chine', 'Dubaï', 'USA', 'Europe'];
-    let orders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
+    let products = [];
+    let categories = [];
+    let origins = [];
+    let orders = [];
 
     window.Shop = {
         currentOrderProduct: null,
@@ -586,6 +583,12 @@
 
         init() {
             this.checkSession();
+            // Chargement prioritaire depuis LocalStorage pour éviter l'écran vide
+            products = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            categories = JSON.parse(localStorage.getItem(CAT_KEY)) || ['Énergie', 'Audio', 'Mobilité'];
+            origins = JSON.parse(localStorage.getItem(ORIGIN_KEY)) || ['Chine', 'Dubaï', 'USA', 'Europe'];
+            orders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
+
             this.renderCategories();
             this.renderOrigins();
             this.render();
@@ -613,17 +616,37 @@
         loadBrandConfig() {
             const config = JSON.parse(localStorage.getItem(STORAGE_KEY));
             if(config) {
-                if(config.logo) { document.getElementById('navLogo').src = config.logo; document.getElementById('modalBrandLogo').src = config.logo; }
-                if(config.companyName) { document.getElementById('navCompanyName').innerText = config.companyName; document.getElementById('modalCompanyName').innerText = config.companyName; }
-                if(config.ceoName) document.getElementById('modalDisplayCEOName').innerText = "PDG : " + config.ceoName;
-                if(config.ceoWhatsapp) document.getElementById('modalDisplayCEOPhone').innerText = config.ceoWhatsapp;
-                if(config.sign) document.getElementById('modalSignature').src = config.sign;
+                if(config.logo) { 
+                    const navLogo = document.getElementById('navLogo');
+                    const modalLogo = document.getElementById('modalBrandLogo');
+                    if(navLogo) navLogo.src = config.logo; 
+                    if(modalLogo) modalLogo.src = config.logo; 
+                }
+                if(config.companyName) { 
+                    const navComp = document.getElementById('navCompanyName');
+                    const modComp = document.getElementById('modalCompanyName');
+                    if(navComp) navComp.innerText = config.companyName; 
+                    if(modComp) modComp.innerText = config.companyName; 
+                }
+                if(config.ceoName) {
+                    const modCeo = document.getElementById('modalDisplayCEOName');
+                    if(modCeo) modCeo.innerText = "PDG : " + config.ceoName;
+                }
+                if(config.ceoWhatsapp) {
+                    const modPhone = document.getElementById('modalDisplayCEOPhone');
+                    if(modPhone) modPhone.innerText = config.ceoWhatsapp;
+                }
+                if(config.sign) {
+                    const modSign = document.getElementById('modalSignature');
+                    if(modSign) modSign.src = config.sign;
+                }
             }
         },
 
         renderCategories() {
             const tabs = document.getElementById('categoryTabs');
             const select = document.getElementById('pCat');
+            if(!tabs) return;
             tabs.innerHTML = `<div class="cat-badge active" onclick="Shop.filter('Tous', this)">Tous</div>` + 
                 categories.map(c => `<div class="cat-badge" onclick="Shop.filter('${c}', this)">${c}${this.isAdmin ? `<i class="bi bi-x-circle btn-del-cat" onclick="event.stopPropagation(); Shop.deleteCategory('${c}')"></i>` : ''}</div>`).join('');
             if(select) select.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
@@ -649,7 +672,11 @@
         render(items = products) {
             const grid = document.getElementById('productGrid');
             if(!grid) return;
-            grid.innerHTML = items.map(p => {
+            if(!items || items.length === 0) {
+                grid.innerHTML = '<div class="col-12 text-center p-5 text-muted"><i class="bi bi-box2 fs-1 d-block mb-3"></i>Aucun produit disponible pour le moment.</div>';
+                return;
+            }
+            grid.innerHTML = items.filter(p => p !== null).map(p => {
                 let displayPrice = "N/D";
                 if(p.canaux) {
                     if(p.canaux.direct?.ttc) displayPrice = p.canaux.direct.ttc.toLocaleString();
@@ -678,7 +705,7 @@
         },
 
         openOrderModal(id) {
-            const p = products.find(x => x.id === id); if(!p) return;
+            const p = products.find(x => x && x.id === id); if(!p) return;
             this.currentOrderProduct = p; this.selectedPrices = [];
             document.getElementById('orderProdImg').src = p.img;
             document.getElementById('orderProdName').innerText = p.name;
@@ -706,8 +733,8 @@
                 <td class="fw-bold"><small>${label}</small></td>
                 <td><input type="number" value="${v}" readonly> <input type="checkbox" id="checkPrice${type}" class="form-check-input mt-1" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.value), this)"></td>
                 <td><input type="number" value="${t}" readonly> <input type="checkbox" id="checkTransit${type}" class="form-check-input mt-1" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.value), this)"></td>
-                <td><input type="number" value="${d}" readonly> <input type="checkbox" id="checkDouane${type}" class="form-check-input mt-1" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.value), this)"></td>
-                <td><input type="number" value="${l}" readonly> <input type="checkbox" id="checkLivraison${type}" class="form-check-input mt-1" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.value), this)"></td>
+                <td><input type="number" value="${d}" readonly> <input type="checkbox" id="checkPrice${type}_d" class="form-check-input mt-1" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.value), this)"></td>
+                <td><input type="number" value="${l}" readonly> <input type="checkbox" id="checkPrice${type}_l" class="form-check-input mt-1" onclick="Shop.togglePriceSelection(parseInt(this.previousElementSibling.value), this)"></td>
                 <td class="fw-bold d-flex align-items-center justify-content-center gap-1"><span class="tot-span" style="cursor:pointer;" onclick="Shop.autoSelectRow(this)">${tot}</span></td>
             </tr>`;
         },
@@ -728,24 +755,25 @@
         calculateOrder() {
             const qty = parseInt(document.getElementById('orderQty').value) || 0; const price = parseInt(document.getElementById('orderCustomPrice').value) || 0; const payed = parseInt(document.getElementById('orderPayment').value) || 0;
             const total = qty * price; document.getElementById('valTotal').innerText = total.toLocaleString() + " F CFA"; const banner = document.getElementById('orderStatusBanner');
-            if(qty > 0 && price > 0) { banner.style.display = "block"; const hasStock = (this.currentOrderProduct.stock >= qty); const paymentOk = (payed >= total && total > 0);
-                if(paymentOk) { if(hasStock) { banner.className = "order-status-banner bg-success-subtle text-success border border-success"; banner.innerHTML = `<i class="bi bi-check-circle-fill"></i> COMMANDE PRÊTE (STOCK DISPO)`; } else { banner.className = "order-status-banner bg-info-subtle text-primary border border-primary"; banner.innerHTML = `<i class="bi bi-clock-history"></i> PROJET ENREGISTRÉ (VAGUE ${this.currentOrderProduct.currentWave || 1})`; } } else { banner.className = "order-status-banner bg-danger-subtle text-danger border border-danger"; banner.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i> PAIEMENT INSUFFISANT`; }
+            if(qty > 0 && price > 0) { banner.style.display = "block"; const hasStock = (this.currentOrderProduct && this.currentOrderProduct.stock >= qty); const paymentOk = (payed >= total && total > 0);
+                if(paymentOk) { if(hasStock) { banner.className = "order-status-banner bg-success-subtle text-success border border-success"; banner.innerHTML = `<i class="bi bi-check-circle-fill"></i> COMMANDE PRÊTE (STOCK DISPO)`; } else { banner.className = "order-status-banner bg-info-subtle text-primary border border-primary"; banner.innerHTML = `<i class="bi bi-clock-history"></i> PROJET ENREGISTRÉ (VAGUE ${this.currentOrderProduct?.currentWave || 1})`; } } else { banner.className = "order-status-banner bg-danger-subtle text-danger border border-danger"; banner.innerHTML = `<i class="bi bi-exclamation-triangle-fill"></i> PAIEMENT INSUFFISANT`; }
             } else { banner.style.display = "none"; }
         },
 
         validateProject() {
             const clientName = document.getElementById('orderClientName').value.trim(); const clientPhone = document.getElementById('orderClientPhone').value.trim(); const qty = parseInt(document.getElementById('orderQty').value) || 0;
             if(!clientName || !clientPhone || qty <= 0) { alert("Erreur : Veuillez remplir tous les champs obligatoires."); return; }
-            const currentProduct = this.currentOrderProduct; const wave = currentProduct.currentWave || 1; const now = new Date(); const dateStr = now.toLocaleDateString('fr-FR'); const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            const currentProduct = this.currentOrderProduct; if(!currentProduct) return;
+            const wave = currentProduct.currentWave || 1; const now = new Date(); const dateStr = now.toLocaleDateString('fr-FR'); const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
             const newOrder = { id: "CMD-" + Date.now(), timestamp: Date.now(), prodId: currentProduct.id, prodName: currentProduct.name, wave: wave, quantity: qty, minOrderRequired: parseInt(currentProduct.minQty) || 1, ref: currentProduct.uniqueId, client: clientName, phone: clientPhone, price: parseInt(document.getElementById('orderCustomPrice').value) || 0, qty: qty, total: (parseInt(document.getElementById('orderCustomPrice').value) || 0) * qty, status: (currentProduct.stock >= qty) ? "Validée" : "À Lancer", date: `${dateStr} à ${timeStr}` };
             orders.push(newOrder); localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
-            if(newOrder.status === "Validée") { const idx = products.findIndex(x => x.id === currentProduct.id); if(idx !== -1) { products[idx].stock -= newOrder.qty; localStorage.setItem(DB_KEY, JSON.stringify(products)); } }
+            if(newOrder.status === "Validée") { const idx = products.findIndex(x => x && x.id === currentProduct.id); if(idx !== -1) { products[idx].stock -= newOrder.qty; localStorage.setItem(DB_KEY, JSON.stringify(products)); } }
             this.checkWaveThreshold(currentProduct.id); bootstrap.Modal.getInstance(document.getElementById('orderModal')).hide(); document.getElementById('successOverlay').style.display = 'flex';
             setTimeout(() => { window.location.href = "panier.html"; }, 2000);
         },
 
         checkWaveThreshold(productId) {
-            const productIdx = products.findIndex(p => p.id === productId); if (productIdx === -1) return;
+            const productIdx = products.findIndex(p => p && p.id === productId); if (productIdx === -1) return;
             const p = products[productIdx]; const currentWave = p.currentWave || 1; const minQty = parseInt(p.minQty) || 1;
             if (minQty > 1) { const totalInWave = orders.filter(o => o.prodId === productId && o.wave === currentWave).reduce((sum, o) => sum + (parseInt(o.qty) || 0), 0);
                 if (totalInWave >= minQty) { products[productIdx].currentWave = currentWave + 1; localStorage.setItem(DB_KEY, JSON.stringify(products)); } }
@@ -754,7 +782,7 @@
         openAddModal() { document.getElementById('editProductId').value = ""; document.getElementById('addProductForm').reset(); document.getElementById('pImgBase64').value = ""; document.getElementById('pMinQty').value = 1; new bootstrap.Modal(document.getElementById('addModal')).show(); },
 
         openEditModal(id) {
-            const p = products.find(x => x.id === id); if(!p) return;
+            const p = products.find(x => x && x.id === id); if(!p) return;
             document.getElementById('editProductId').value = p.id; document.getElementById('pName').value = p.name; document.getElementById('pCat').value = p.cat; document.getElementById('pQualities').value = p.qualities || ""; document.getElementById('pStock').value = p.stock || ""; document.getElementById('pMinQty').value = p.minQty || 1; document.getElementById('pPriceBuy').value = p.priceBuy || ""; document.getElementById('pCurrency').value = p.currency || "F CFA"; document.getElementById('pOrigin').value = p.origin || ""; document.getElementById('pImgBase64').value = p.img;
             if(p.canaux) {
                 document.getElementById('pAvionVente').value = p.canaux.avion?.vente || ""; document.getElementById('pAvionTransit').value = p.canaux.avion?.transit || ""; document.getElementById('pAvionDouane').value = p.canaux.avion?.douane || ""; document.getElementById('pAvionLiv').value = p.canaux.avion?.liv || "";
@@ -765,14 +793,14 @@
         },
 
         saveProduct(e) {
-            if(e) e.preventDefault(); const editId = document.getElementById('editProductId').value; const pOld = editId ? products.find(x => x.id == editId) : null;
+            if(e) e.preventDefault(); const editId = document.getElementById('editProductId').value; const pOld = editId ? products.find(x => x && x.id == editId) : null;
             const pData = { id: editId ? parseInt(editId) : Date.now(), uniqueId: editId ? pOld.uniqueId : "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase(), currentWave: editId ? (pOld.currentWave || 1) : 1, name: document.getElementById('pName').value, priceBuy: parseFloat(document.getElementById('pPriceBuy').value) || 0, cat: document.getElementById('pCat').value, qualities: document.getElementById('pQualities').value, stock: parseInt(document.getElementById('pStock').value) || 0, minQty: parseInt(document.getElementById('pMinQty').value) || 1, currency: document.getElementById('pCurrency').value, origin: document.getElementById('pOrigin').value, img: document.getElementById('pImgBase64').value || "https://via.placeholder.com/150", canaux: { avion: { vente: parseInt(document.getElementById('pAvionVente').value) || 0, transit: parseInt(document.getElementById('pAvionTransit').value) || 0, douane: parseInt(document.getElementById('pAvionDouane').value) || 0, liv: parseInt(document.getElementById('pAvionLiv').value) || 0 }, bateau: { vente: parseInt(document.getElementById('pBateauVente').value) || 0, transit: parseInt(document.getElementById('pBateauTransit').value) || 0, douane: parseInt(document.getElementById('pBateauDouane').value) || 0, liv: parseInt(document.getElementById('pBateauLiv').value) || 0 }, direct: { ttc: parseInt(document.getElementById('pDirectTTC').value) || 0, grosTTC: parseInt(document.getElementById('pGrosTTC').value) || 0, grosQty: parseInt(document.getElementById('pGrosQty').value) || 0 } } };
-            if(editId) { const idx = products.findIndex(x => x.id == editId); products[idx] = pData; } else { products.push(pData); }
+            if(editId) { const idx = products.findIndex(x => x && x.id == editId); products[idx] = pData; } else { products.push(pData); }
             localStorage.setItem(DB_KEY, JSON.stringify(products)); bootstrap.Modal.getInstance(document.getElementById('addModal')).hide(); this.init();
         },
 
         showDetails(id) {
-            const p = products.find(x => x.id === id); if(!p) return;
+            const p = products.find(x => x && x.id === id); if(!p) return;
             const wave = p.currentWave || 1; document.getElementById('currentProductId').value = p.id; document.getElementById('modalImg').src = p.img; document.getElementById('modalTitle').innerText = p.name; document.getElementById('modalQualities').innerText = p.qualities || ""; document.getElementById('modalUniqueIdDisplay').innerText = p.uniqueId; document.getElementById('modalOrigin').innerText = "Origine : " + (p.origin || 'N/C');
             const waveBadge = document.getElementById('modalWaveNumber'); if(p.minQty > 1) { waveBadge.innerText = "VAGUE N°" + wave; waveBadge.style.display = "inline-block"; } else { waveBadge.style.display = "none"; }
             const totalInWave = orders.filter(o => o.prodId === p.id && o.wave === wave).reduce((sum, o) => sum + (parseInt(o.qty) || 0), 0);
@@ -788,7 +816,7 @@
         },
 
         getPublishText() {
-            const config = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; const p = products.find(x => x.id == document.getElementById('currentProductId').value); const wave = p.currentWave || 1;
+            const config = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; const p = products.find(x => x && x.id == document.getElementById('currentProductId').value); if(!p) return ""; const wave = p.currentWave || 1;
             const totalInWave = orders.filter(o => o.prodId === p.id && o.wave === wave).reduce((sum, o) => sum + (parseInt(o.qty) || 0), 0);
             const minT = parseInt(p.minQty) || 1; const stockTxt = (p && p.stock > 0) ? `✅ Stock : ${p.stock}` : `⏳ Sur commande (${totalInWave}/${minT} - Vague ${wave})`;
             const phoneForLink = (config.ceoWhatsapp || "").replace(/\s+/g, '').replace('+', ''); const curr = p.currency || 'F CFA'; let priceTxt = "";
@@ -797,57 +825,102 @@
                 if(p.canaux.bateau?.vente) { const c = p.canaux.bateau; const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0); priceTxt += `🚢 *BATEAU :* ${tot.toLocaleString()} ${curr}\n`; }
                 if(p.canaux.direct?.ttc) { priceTxt += `🏠 *MAGASIN :* ${p.canaux.direct.ttc.toLocaleString()} ${curr}\n`; }
             }
-            return `🌟 *DISPONIBILITÉ : ${config.companyName || "MT & B-One"}*\n━━━━━━━━━━━━━━━━━━\n\n📦 *Produit :* ${p.name}\n🔍 *Réf :* ${p.uniqueId}\n📊 *État :* ${stockTxt}\n✨ *Qualités :* ${p.qualities || 'Qualité Premium'}\n\n💰 *TARIFS :*\n${priceTxt}\n📲 *Contact PDG :* https://wa.me/${phoneForLink}\n✍️ _Signé : ${config.ceoName || "L'Administrateur"}_`;
+            return `🌟 *DISPONIBILITÉ : ${config.companyName || "MT & B-One"}*\n━━━━━━━━━━━━━━━━━━\n\n📦 *Produit :* ${p.name}\n🔍 *Réf :* ${p.uniqueId}\n📊 *État :* ${stockTxt}\n🛒 *Qté Min. :* ${minT} unité(s)\n✨ *Qualités :* ${p.qualities || 'Qualité Premium'}\n\n💰 *TARIFS :*\n${priceTxt}\n📲 *Contact PDG :* https://wa.me/${phoneForLink}\n✍️ _Signé : ${config.ceoName || "L'Administrateur"}_`;
         },
 
         publishToStatus() { window.open(`https://wa.me/?text=${encodeURIComponent(this.getPublishText())}`, '_blank'); },
 
-        shareProductImg() { const area = document.getElementById('captureArea'); html2canvas(area, { useCORS: true, scale: 2 }).then(canvas => { const link = document.createElement('a'); link.download = `Fiche_Produit.png`; link.href = canvas.toDataURL("image/png"); link.click(); }); },
+        shareProductImg() { 
+            const textToCopy = this.getPublishText();
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                console.log("Texte copié dans le presse-papier");
+            }).catch(err => {
+                console.error("Erreur de copie : ", err);
+            });
+
+            const area = document.getElementById('captureArea'); 
+            html2canvas(area, { useCORS: true, scale: 2 }).then(canvas => { 
+                const link = document.createElement('a'); 
+                link.download = `Fiche_Produit.png`; 
+                link.href = canvas.toDataURL("image/png"); 
+                link.click(); 
+            }); 
+        },
 
         shareProductLink() { const config = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; const phoneForLink = (config.ceoWhatsapp || "").replace(/\s+/g, '').replace('+', ''); const msg = `*DEMANDE DE COMMANDE*\nJe souhaite commander : ${document.getElementById('modalTitle').innerText} (Ref: ${document.getElementById('modalUniqueIdDisplay').innerText})`; window.open(`https://wa.me/${phoneForLink}?text=${encodeURIComponent(msg)}`, '_blank'); },
 
-        deleteCurrentProduct() { if(confirm("Supprimer ?")) { const id = parseInt(document.getElementById('currentProductId').value); products = products.filter(p => p.id !== id); localStorage.setItem(DB_KEY, JSON.stringify(products)); bootstrap.Modal.getInstance(document.getElementById('productModal')).hide(); this.init(); } },
+        deleteCurrentProduct() { if(confirm("Supprimer ?")) { const id = parseInt(document.getElementById('currentProductId').value); products = products.filter(p => p && p.id !== id); localStorage.setItem(DB_KEY, JSON.stringify(products)); bootstrap.Modal.getInstance(document.getElementById('productModal')).hide(); this.init(); } },
 
         renderAdminTable() {
             const tbody = document.getElementById('adminProductTable'); if(!tbody) return;
-            tbody.innerHTML = products.map(p => `<tr><td><code class="small">${p.uniqueId}</code></td><td><b>${p.name}</b> <small class="text-muted">(V${p.currentWave || 1})</small></td><td><span class="badge ${p.stock > 0 ? 'bg-success' : 'bg-secondary'}">${p.stock || 0}</span></td><td>${p.canaux?.avion?.vente ? '✈️' : ''} ${p.canaux?.bateau?.vente ? '🚢' : ''} ${p.canaux?.direct?.ttc ? '🏠' : ''}</td><td class="text-end"><div class="btn-group"><button class="btn btn-sm btn-outline-primary" onclick="Shop.duplicateProduct(${p.id})"><i class="bi bi-copy"></i></button><button class="btn btn-sm btn-outline-danger" onclick="Shop.deleteProduct(${p.id})"><i class="bi bi-trash"></i></button></div></td></tr>`).join('');
+            tbody.innerHTML = products.filter(p => p !== null).map(p => `<tr><td><code class="small">${p.uniqueId}</code></td><td><b>${p.name}</b> <small class="text-muted">(V${p.currentWave || 1})</small></td><td><span class="badge ${p.stock > 0 ? 'bg-success' : 'bg-secondary'}">${p.stock || 0}</span></td><td>${p.canaux?.avion?.vente ? '✈️' : ''} ${p.canaux?.bateau?.vente ? '🚢' : ''} ${p.canaux?.direct?.ttc ? '🏠' : ''}</td><td class="text-end"><div class="btn-group"><button class="btn btn-sm btn-outline-primary" onclick="Shop.duplicateProduct(${p.id})"><i class="bi bi-copy"></i></button><button class="btn btn-sm btn-outline-danger" onclick="Shop.deleteProduct(${p.id})"><i class="bi bi-trash"></i></button></div></td></tr>`).join('');
         },
 
         renderOrdersTable() {
             const tbody = document.getElementById('adminOrdersTable'); if(!tbody) return;
-            tbody.innerHTML = orders.map(o => `<tr><td><small>${o.date}</small></td><td><b>${o.client}</b></td><td>${o.prodName} (x${o.qty}) <small class="text-muted">V${o.wave}</small></td><td class="fw-bold">${o.total.toLocaleString()}</td><td><span class="badge ${o.status === 'Validée' ? 'bg-success' : 'bg-info'}">${o.status}</span></td><td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="Shop.deleteOrder(${o.id})"><i class="bi bi-trash-fill"></i></button></td></tr>`).reverse().join('');
+            tbody.innerHTML = orders.filter(o => o !== null).map(o => `<tr><td><small>${o.date}</small></td><td><b>${o.client}</b></td><td>${o.prodName} (x${o.qty}) <small class="text-muted">V${o.wave}</small></td><td class="fw-bold">${o.total.toLocaleString()}</td><td><span class="badge ${o.status === 'Validée' ? 'bg-success' : 'bg-info'}">${o.status}</span></td><td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="Shop.deleteOrder(${o.id})"><i class="bi bi-trash-fill"></i></button></td></tr>`).reverse().join('');
         },
 
-        deleteOrder(id) { if(confirm("Supprimer ?")) { orders = orders.filter(o => o.id != id); localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); this.renderOrdersTable(); } },
+        deleteOrder(id) { if(confirm("Supprimer ?")) { orders = orders.filter(o => o && o.id != id); localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); this.renderOrdersTable(); } },
 
-        duplicateProduct(id) { const p = products.find(x => x.id === id); const clone = JSON.parse(JSON.stringify(p)); clone.id = Date.now(); clone.uniqueId = "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase(); clone.name += " (Copie)"; clone.currentWave = 1; products.push(clone); localStorage.setItem(DB_KEY, JSON.stringify(products)); this.init(); },
+        duplicateProduct(id) { const p = products.find(x => x && x.id === id); if(!p) return; const clone = JSON.parse(JSON.stringify(p)); clone.id = Date.now(); clone.uniqueId = "BONE-" + Math.random().toString(36).substr(2, 5).toUpperCase(); clone.name += " (Copie)"; clone.currentWave = 1; products.push(clone); localStorage.setItem(DB_KEY, JSON.stringify(products)); this.init(); },
 
-        deleteProduct(id) { if(confirm("Supprimer ?")) { products = products.filter(p => p.id !== id); localStorage.setItem(DB_KEY, JSON.stringify(products)); this.init(); } },
+        deleteProduct(id) { if(confirm("Supprimer ?")) { products = products.filter(p => p && p.id !== id); localStorage.setItem(DB_KEY, JSON.stringify(products)); this.init(); } },
 
-        search() { const q = document.getElementById('searchInput').value.toLowerCase(); this.render(products.filter(p => p.name.toLowerCase().includes(q))); },
+        search() { const q = document.getElementById('searchInput').value.toLowerCase(); this.render(products.filter(p => p && p.name.toLowerCase().includes(q))); },
 
-        filter(cat, el) { document.querySelectorAll('.cat-badge').forEach(b => b.classList.remove('active')); el.classList.add('active'); this.render(cat === 'Tous' ? products : products.filter(p => p.cat === cat)); }
+        filter(cat, el) { document.querySelectorAll('.cat-badge').forEach(b => b.classList.remove('active')); el.classList.add('active'); this.render(cat === 'Tous' ? products : products.filter(p => p && p.cat === cat)); }
     };
+
+    function processAndCompressImage(file, callback) {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = function(event) {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const MAX_SIZE = 800; 
+                let width = img.width;
+                let height = img.height;
+                if (width > height) {
+                    if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+                } else {
+                    if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                callback(dataUrl);
+            };
+        };
+    }
 
     const imgInput = document.getElementById('pImgFile');
     if(imgInput) {
-        imgInput.onchange = function(e) { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = function(event) { document.getElementById('pImgBase64').value = event.target.result; }; reader.readAsDataURL(file); };
+        imgInput.onchange = function(e) { 
+            const file = e.target.files[0]; 
+            if(!file) return; 
+            const statusLabel = document.getElementById('compressingStatus');
+            if(statusLabel) statusLabel.style.display = 'block';
+            processAndCompressImage(file, (compressedBase64) => {
+                const imgHidden = document.getElementById('pImgBase64');
+                if(imgHidden) imgHidden.value = compressedBase64;
+                if(statusLabel) {
+                    statusLabel.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Image optimisée avec succès !';
+                    setTimeout(() => statusLabel.style.display = 'none', 3000);
+                }
+            });
+        };
     }
 
     const addForm = document.getElementById('addProductForm');
-    if(addForm) {
-        addForm.onsubmit = function(e) { Shop.saveProduct(e); };
-    }
+    if(addForm) { addForm.onsubmit = function(e) { Shop.saveProduct(e); }; }
 
-    // Lancer la synchro et l'init
-    initCloudSync(() => {
-        products = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-        categories = JSON.parse(localStorage.getItem(CAT_KEY)) || [];
-        origins = JSON.parse(localStorage.getItem(ORIGIN_KEY)) || [];
-        orders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
-        Shop.init();
-    });
-
+    // Démarrage : Sync et init
+    initCloudSync(() => { Shop.init(); });
     window.onload = () => { Shop.init(); };
 </script>
 
