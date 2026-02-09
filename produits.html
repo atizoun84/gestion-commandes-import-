@@ -811,6 +811,8 @@
                 if(c.avion?.vente) { const tot = (parseInt(c.avion.vente)||0) + (parseInt(c.avion.transit)||0) + (parseInt(c.avion.douane)||0) + (parseInt(c.avion.liv)||0); htmlPrices += `<div class="mb-2 p-2 border rounded"><div class="d-flex justify-content-between fw-bold text-primary"><span>✈️ AVION</span><span>${tot.toLocaleString()} ${curr}</span></div><div class="price-detail-box">Base: ${c.avion.vente} | Transit: ${c.avion.transit} | Douane: ${c.avion.douane} | Liv: ${c.avion.liv}</div></div>`; }
                 if(c.bateau?.vente) { const tot = (parseInt(c.bateau.vente)||0) + (parseInt(c.bateau.transit)||0) + (parseInt(c.bateau.douane)||0) + (parseInt(c.bateau.liv)||0); htmlPrices += `<div class="mb-2 p-2 border rounded"><div class="d-flex justify-content-between fw-bold text-info"><span>🚢 BATEAU</span><span>${tot.toLocaleString()} ${curr}</span></div><div class="price-detail-box">Base: ${c.bateau.vente} | Transit: ${c.bateau.transit} | Douane: ${c.bateau.douane} | Liv: ${c.bateau.liv}</div></div>`; }
                 if(c.direct?.ttc) { htmlPrices += `<div class="mb-2 p-2 border rounded bg-light"><div class="d-flex justify-content-between fw-bold text-success"><span>🏠 AU MAGASIN (Direct)</span><span>${c.direct.ttc.toLocaleString()} ${curr}</span></div></div>`; }
+                // Ajout dynamique du prix de gros s'il existe
+                if(c.direct?.grosTTC && c.direct?.grosQty) { htmlPrices += `<div class="mb-2 p-2 border border-warning rounded bg-warning-subtle"><div class="d-flex justify-content-between fw-bold text-dark"><span>💰 PRIX DE GROS</span><span>${c.direct.grosTTC.toLocaleString()} ${curr}</span></div><div class="text-muted" style="font-size:0.7rem;">Minimum: ${c.direct.grosQty} unités</div></div>`; }
             }
             document.getElementById('modalPriceList').innerHTML = htmlPrices || "<p class='text-muted'>Aucun prix configuré</p>"; this.loadBrandConfig(); new bootstrap.Modal(document.getElementById('productModal')).show(); appliquerRestrictions();
         },
@@ -824,6 +826,8 @@
                 if(p.canaux.avion?.vente) { const c = p.canaux.avion; const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0); priceTxt += `✈️ *AVION :* ${tot.toLocaleString()} ${curr}\n`; }
                 if(p.canaux.bateau?.vente) { const c = p.canaux.bateau; const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0); priceTxt += `🚢 *BATEAU :* ${tot.toLocaleString()} ${curr}\n`; }
                 if(p.canaux.direct?.ttc) { priceTxt += `🏠 *MAGASIN :* ${p.canaux.direct.ttc.toLocaleString()} ${curr}\n`; }
+                // Ajout des infos de gros dans le texte WhatsApp
+                if(p.canaux.direct?.grosTTC) { priceTxt += `💰 *GROS (${p.canaux.direct.grosQty}+ pcs) :* ${p.canaux.direct.grosTTC.toLocaleString()} ${curr}\n`; }
             }
             return `🌟 *DISPONIBILITÉ : ${config.companyName || "MT & B-One"}*\n━━━━━━━━━━━━━━━━━━\n\n📦 *Produit :* ${p.name}\n🔍 *Réf :* ${p.uniqueId}\n📊 *État :* ${stockTxt}\n🛒 *Qté Min. :* ${minT} unité(s)\n✨ *Qualités :* ${p.qualities || 'Qualité Premium'}\n\n💰 *TARIFS :*\n${priceTxt}\n📲 *Contact PDG :* https://wa.me/${phoneForLink}\n✍️ _Signé : ${config.ceoName || "L'Administrateur"}_`;
         },
