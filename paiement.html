@@ -241,7 +241,6 @@
     const APP_PREFIX = 'BONE_'; 
     const DB_PATH = 'data_sync/';
 
-    // --- 1. L'INTERCEPTEUR (Surcharge du LocalStorage) ---
     const nativeSetItem = localStorage.setItem;
     localStorage.setItem = function(key, value) {
         try {
@@ -262,7 +261,6 @@
         }
     };
 
-    // --- 2. LA SYNCHRO BIDIRECTIONNELLE ---
     function initCloudSync(refreshCallback) {
         const dataRef = ref(db, DB_PATH);
         onValue(dataRef, (snapshot) => {
@@ -288,7 +286,6 @@
         });
     }
 
-    // Export vers window pour usage dans Shop.init
     window.initCloudSync = initCloudSync;
 </script>
 
@@ -308,7 +305,6 @@
             orderModalObj = new bootstrap.Modal(document.getElementById('orderModal'));
             publishModalObj = new bootstrap.Modal(document.getElementById('publishModal'));
             
-            // Lancement de la synchro Cloud
             if(window.initCloudSync) {
                 window.initCloudSync(() => {
                     this.renderOrders();
@@ -350,14 +346,17 @@
             }
             
             table.innerHTML = filteredOrders.map((o) => {
-                const qte = parseInt(o.quantity || o.qty) || 1;
-                const totalDu = ((parseFloat(o.price) || 0) + (parseFloat(o.transit) || 0) + (parseFloat(o.douane) || 0) + (parseFloat(o.livraison) || 0)) * qte;
+                const qte = parseInt(o.qty || o.quantity) || 1;
+                const totalDu = o.total || ((parseFloat(o.price) || 0) + (parseFloat(o.transit) || 0) + (parseFloat(o.douane) || 0) + (parseFloat(o.livraison) || 0)) * qte;
                 
-                let paid = 0;
-                if(o.isPricePayed) paid += (parseFloat(o.price) || 0) * qte;
-                if(o.isTransitPayed) paid += (parseFloat(o.transit) || 0) * qte;
-                if(o.isDouanePayed) paid += (parseFloat(o.douane) || 0) * qte;
-                if(o.isLivraisonPayed) paid += (parseFloat(o.livraison) || 0) * qte;
+                let paid = parseFloat(o.paymentReceived) || 0;
+                // Si paymentReceived n'est pas explicite, on calcule selon les drapeaux
+                if (!o.hasOwnProperty('paymentReceived')) {
+                    if(o.isPricePayed) paid += (parseFloat(o.price) || 0) * qte;
+                    if(o.isTransitPayed) paid += (parseFloat(o.transit) || 0) * qte;
+                    if(o.isDouanePayed) paid += (parseFloat(o.douane) || 0) * qte;
+                    if(o.isLivraisonPayed) paid += (parseFloat(o.livraison) || 0) * qte;
+                }
 
                 const reste = totalDu - paid;
                 return `
@@ -367,8 +366,8 @@
                         <div class="fw-bold text-dark">${o.client || 'Client'}</div>
                         <div class="text-muted" style="font-size: 0.75rem;">${o.prodName}</div>
                     </td>
-                    <td class="text-end fw-bold ${reste > 0 ? 'text-danger' : 'text-success'}">
-                        ${reste.toLocaleString()} F CFA
+                    <td class="text-end fw-bold ${reste > 1 ? 'text-danger' : 'text-success'}">
+                        ${Math.max(0, reste).toLocaleString()} F CFA
                     </td>
                 </tr>`;
             }).reverse().join('');
@@ -378,19 +377,31 @@
             selectedOrder = userOrders.find(o => o.id === orderId);
             if(!selectedOrder) return;
             const p = products.find(prod => prod.id === selectedOrder.prodId) || {};
-            const qte = parseInt(selectedOrder.quantity || selectedOrder.qty) || 1;
+            const qte = parseInt(selectedOrder.qty || selectedOrder.quantity) || 1;
+            
             document.getElementById('editOrderId').value = orderId;
             document.getElementById('orderModalImg').src = p.img || '';
             document.getElementById('orderModalTitle').innerText = selectedOrder.prodName;
             document.getElementById('displayClientName').innerText = `Client: ${selectedOrder.client} (Qté: ${qte})`;
-            document.getElementById('valBase').innerText = (parseFloat(selectedOrder.price) * qte).toLocaleString();
-            document.getElementById('valTransit').innerText = (parseFloat(selectedOrder.transit) * qte).toLocaleString();
-            document.getElementById('valDouane').innerText = (parseFloat(selectedOrder.douane) * qte).toLocaleString();
-            document.getElementById('valLivr').innerText = (parseFloat(selectedOrder.livraison) * qte).toLocaleString();
-            document.getElementById('paidBase').value = selectedOrder.isPricePayed ? (parseFloat(selectedOrder.price) * qte) : 0;
-            document.getElementById('paidTransit').value = selectedOrder.isTransitPayed ? (parseFloat(selectedOrder.transit) * qte) : 0;
-            document.getElementById('paidDouane').value = selectedOrder.isDouanePayed ? (parseFloat(selectedOrder.douane) * qte) : 0;
-            document.getElementById('paidLivr').value = selectedOrder.isLivraisonPayed ? (parseFloat(selectedOrder.livraison) * qte) : 0;
+            
+            // Initialisation des totaux dus par catégorie
+            const valVente = parseFloat(selectedOrder.price || 0) * qte;
+            const valTransit = parseFloat(selectedOrder.transit || 0) * qte;
+            const valDouane = parseFloat(selectedOrder.douane || 0) * qte;
+            const valLivr = parseFloat(selectedOrder.livraison || 0) * qte;
+
+            document.getElementById('valBase').innerText = valVente.toLocaleString();
+            document.getElementById('valTransit').innerText = valTransit.toLocaleString();
+            document.getElementById('valDouane').innerText = valDouane.toLocaleString();
+            document.getElementById('valLivr').innerText = valLivr.toLocaleString();
+            
+            // REPORTER LES MONTANTS DÉJÀ PAYÉS : 
+            // On vérifie si la catégorie était marquée comme payée lors de la commande initiale
+            document.getElementById('paidBase').value = selectedOrder.isPricePayed ? valVente : (selectedOrder.paidBase || 0);
+            document.getElementById('paidTransit').value = selectedOrder.isTransitPayed ? valTransit : (selectedOrder.paidTransit || 0);
+            document.getElementById('paidDouane').value = selectedOrder.isDouanePayed ? valDouane : (selectedOrder.paidDouane || 0);
+            document.getElementById('paidLivr').value = selectedOrder.isLivraisonPayed ? valLivr : (selectedOrder.paidLivr || 0);
+            
             this.updateTotalDisplay();
             orderModalObj.show();
         },
@@ -403,22 +414,46 @@
 
         updateTotalDisplay() {
             if(!selectedOrder) return;
-            const qte = parseInt(selectedOrder.quantity || selectedOrder.qty) || 1;
+            const qte = parseInt(selectedOrder.qty || selectedOrder.quantity) || 1;
             const totalDu = ((parseFloat(selectedOrder.price) || 0) + (parseFloat(selectedOrder.transit) || 0) + (parseFloat(selectedOrder.douane) || 0) + (parseFloat(selectedOrder.livraison) || 0)) * qte;
-            const totalPaye = (parseFloat(document.getElementById('paidBase').value) || 0) + (parseFloat(document.getElementById('paidTransit').value) || 0) + (parseFloat(document.getElementById('paidDouane').value) || 0) + (parseFloat(document.getElementById('paidLivr').value) || 0);
+            
+            const pBase = parseFloat(document.getElementById('paidBase').value) || 0;
+            const pTransit = parseFloat(document.getElementById('paidTransit').value) || 0;
+            const pDouane = parseFloat(document.getElementById('paidDouane').value) || 0;
+            const pLivr = parseFloat(document.getElementById('paidLivr').value) || 0;
+            
+            const totalPaye = pBase + pTransit + pDouane + pLivr;
             const reste = totalDu - totalPaye;
-            document.getElementById('orderTotalDisplay').innerText = `${reste.toLocaleString()} F CFA`;
+            document.getElementById('orderTotalDisplay').innerText = `${Math.max(0, reste).toLocaleString()} F CFA`;
         },
 
         submitDirectOrder() {
             const orderId = document.getElementById('editOrderId').value;
             const orderIndex = userOrders.findIndex(o => o.id === orderId);
             if(orderIndex === -1) return;
-            const qte = parseInt(userOrders[orderIndex].quantity || userOrders[orderIndex].qty) || 1;
-            userOrders[orderIndex].isPricePayed = (parseFloat(document.getElementById('paidBase').value) >= (parseFloat(userOrders[orderIndex].price) * qte));
-            userOrders[orderIndex].isTransitPayed = (parseFloat(document.getElementById('paidTransit').value) >= (parseFloat(userOrders[orderIndex].transit) * qte));
-            userOrders[orderIndex].isDouanePayed = (parseFloat(document.getElementById('paidDouane').value) >= (parseFloat(userOrders[orderIndex].douane) * qte));
-            userOrders[orderIndex].isLivraisonPayed = (parseFloat(document.getElementById('paidLivr').value) >= (parseFloat(userOrders[orderIndex].livraison) * qte));
+            
+            const qte = parseInt(userOrders[orderIndex].qty || userOrders[orderIndex].quantity) || 1;
+            
+            const pBase = parseFloat(document.getElementById('paidBase').value) || 0;
+            const pTransit = parseFloat(document.getElementById('paidTransit').value) || 0;
+            const pDouane = parseFloat(document.getElementById('paidDouane').value) || 0;
+            const pLivr = parseFloat(document.getElementById('paidLivr').value) || 0;
+
+            // Mise à jour des drapeaux de paiement (Vrai si le montant saisi >= montant dû)
+            userOrders[orderIndex].isPricePayed = (pBase >= (parseFloat(userOrders[orderIndex].price) * qte));
+            userOrders[orderIndex].isTransitPayed = (pTransit >= (parseFloat(userOrders[orderIndex].transit) * qte));
+            userOrders[orderIndex].isDouanePayed = (pDouane >= (parseFloat(userOrders[orderIndex].douane) * qte));
+            userOrders[orderIndex].isLivraisonPayed = (pLivr >= (parseFloat(userOrders[orderIndex].livraison) * qte));
+            
+            // Sauvegarde des montants exacts pour le prochain affichage
+            userOrders[orderIndex].paidBase = pBase;
+            userOrders[orderIndex].paidTransit = pTransit;
+            userOrders[orderIndex].paidDouane = pDouane;
+            userOrders[orderIndex].paidLivr = pLivr;
+            
+            // Mise à jour du total global payé
+            userOrders[orderIndex].paymentReceived = pBase + pTransit + pDouane + pLivr;
+
             localStorage.setItem(ORDERS_KEY, JSON.stringify(userOrders));
             orderModalObj.hide();
             this.renderOrders();
@@ -431,20 +466,20 @@
                 container.innerHTML = `<p class="text-center py-4">Aucune donnée.</p>`;
             } else {
                 container.innerHTML = userOrders.map(o => {
-                    const qte = parseInt(o.quantity || o.qty) || 1;
+                    const qte = parseInt(o.qty || o.quantity) || 1;
                     const vTotal = (parseFloat(o.price) || 0) * qte;
                     const tTotal = (parseFloat(o.transit) || 0) * qte;
                     const dTotal = (parseFloat(o.douane) || 0) * qte;
                     const lTotal = (parseFloat(o.livraison)||0)*qte;
-                    const totalDu = vTotal + tTotal + dTotal + lTotal;
-                    const paid = (o.isPricePayed?vTotal:0) + (o.isTransitPayed?tTotal:0) + (o.isDouanePayed?dTotal:0) + (o.isLivraisonPayed?lTotal:0);
+                    const totalDu = o.total || (vTotal + tTotal + dTotal + lTotal);
+                    const paid = parseFloat(o.paymentReceived) || 0;
                     const reste = totalDu - paid;
                     return `
                     <div class="publish-item">
                         <h6 class="fw-bold mb-1">${o.client} - ${o.prodName} <span class="badge bg-light text-dark border small">V${o.wave||1}</span></h6>
                         <div class="small">
                             Vente: ${o.isPricePayed ? '✅' : '❌'} | Transit: ${o.isTransitPayed ? '✅' : '❌'} | Douane: ${o.isDouanePayed ? '✅' : '❌'}<br>
-                            <span class="text-danger fw-bold">RESTE TOTAL : ${reste.toLocaleString()} F CFA</span>
+                            <span class="text-danger fw-bold">RESTE TOTAL : ${Math.max(0, reste).toLocaleString()} F CFA</span>
                         </div>
                     </div>`;
                 }).join('');
@@ -459,10 +494,11 @@
             const ceo = document.getElementById('pubCEO').innerText;
             let text = `📢 *${company} - BULLETIN OFFICIEL*\n📅 _${dateStr}_\n\n*SITUATION DES PAIEMENTS :*\n`;
             userOrders.forEach(o => {
-                const qte = parseInt(o.quantity || o.qty) || 1;
-                const totalDu = ((parseFloat(o.price)||0)+(parseFloat(o.transit)||0)+(parseFloat(o.douane)||0)+(parseFloat(o.livraison)||0))*qte;
-                const paid = (o.isPricePayed?((parseFloat(o.price)||0)*qte):0) + (o.isTransitPayed?((parseFloat(o.transit)||0)*qte):0) + (o.isDouanePayed?((parseFloat(o.douane)||0)*qte):0) + (o.isLivraisonPayed?((parseFloat(o.livraison)||0)*qte):0);
-                text += `👤 *Client :* ${o.client}\n📦 *Produit :* ${o.prodName}\n❌ *RESTE :* ${(totalDu - paid).toLocaleString()} F CFA\n---\n`;
+                const qte = parseInt(o.qty || o.quantity) || 1;
+                const totalDu = o.total || ((parseFloat(o.price)||0)+(parseFloat(o.transit)||0)+(parseFloat(o.douane)||0)+(parseFloat(o.livraison)||0))*qte;
+                const paid = parseFloat(o.paymentReceived) || 0;
+                const reste = totalDu - paid;
+                text += `👤 *Client :* ${o.client}\n📦 *Produit :* ${o.prodName}\n❌ *RESTE :* ${Math.max(0, reste).toLocaleString()} F CFA\n---\n`;
             });
             text += `\n✍️ *Signé : ${ceo}*`;
             navigator.clipboard.writeText(text).then(() => {

@@ -290,7 +290,6 @@
     const APP_PREFIX = 'BONE_'; 
     const DB_PATH = 'data_sync/';
 
-    // Intercepteur LocalStorage
     const nativeSetItem = localStorage.setItem;
     localStorage.setItem = function(key, value) {
         try {
@@ -311,7 +310,6 @@
         }
     };
 
-    // Synchro Bidirectionnelle
     window.initCloudSync = function(refreshCallback) {
         const dataRef = ref(db, DB_PATH);
         onValue(dataRef, (snapshot) => {
@@ -337,7 +335,6 @@
         });
     };
 
-    // Lancement de la synchro au démarrage
     window.initCloudSync(() => {
         if (typeof Finance !== 'undefined') Finance.renderAccounting();
     });
@@ -345,7 +342,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Vérification stricte Admin
     const sessionLocal = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
     if (!sessionLocal || sessionLocal.role !== 'admin') {
         window.location.href = 'login.html';
@@ -465,8 +461,23 @@
                 let unitAcquisition = order.acquisitionPrice && parseFloat(order.acquisitionPrice) > 0 ? parseFloat(order.acquisitionPrice) : (productInCatalog?.priceBuy || order.rawPrice || 0);
                 const quantity = parseInt(order.qty || order.quantity) || 1;
                 const acqTotal = unitAcquisition * quantity;
-                const payedAmount = ((order.isPricePayed ? (parseFloat(order.price)||0) : 0) + (order.isTransitPayed ? (parseFloat(order.transit)||0) : 0) + (order.isDouanePayed ? (parseFloat(order.douane)||0) : 0) + (order.isLivraisonPayed ? (parseFloat(order.livraison)||0) : 0)) * quantity;
+                
+                // --- MISE À JOUR INTELLIGENTE DU CALCUL DU PAYÉ ---
+                // On privilégie 'paymentReceived' qui est la somme totale enregistrée dans le suivi des paiements
+                let payedAmount = 0;
+                if (order.paymentReceived !== undefined) {
+                    payedAmount = parseFloat(order.paymentReceived);
+                } else {
+                    // Fallback sur le calcul par drapeaux si paymentReceived est absent
+                    const priceVal = (order.isPricePayed ? (parseFloat(order.price) || 0) : 0);
+                    const transitVal = (order.isTransitPayed ? (parseFloat(order.transit) || 0) : 0);
+                    const douaneVal = (order.isDouanePayed ? (parseFloat(order.douane) || 0) : 0);
+                    const livraisonVal = (order.isLivraisonPayed ? (parseFloat(order.livraison) || 0) : 0);
+                    payedAmount = (priceVal + transitVal + douaneVal + livraisonVal) * quantity;
+                }
+                
                 const growth = acqTotal * growthRate;
+                // La marge réelle est calculée sur ce qui a été effectivement encaissé moins le capital et l'épargne croissance
                 const profit = payedAmount - acqTotal - growth;
 
                 stats.sales += payedAmount; stats.acq += acqTotal; stats.growth += growth; stats.gross += profit;

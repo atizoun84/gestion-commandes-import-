@@ -583,7 +583,6 @@
 
         init() {
             this.checkSession();
-            // Chargement prioritaire depuis LocalStorage pour éviter l'écran vide
             products = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             categories = JSON.parse(localStorage.getItem(CAT_KEY)) || ['Énergie', 'Audio', 'Mobilité'];
             origins = JSON.parse(localStorage.getItem(ORIGIN_KEY)) || ['Chine', 'Dubaï', 'USA', 'Europe'];
@@ -765,7 +764,24 @@
             if(!clientName || !clientPhone || qty <= 0) { alert("Erreur : Veuillez remplir tous les champs obligatoires."); return; }
             const currentProduct = this.currentOrderProduct; if(!currentProduct) return;
             const wave = currentProduct.currentWave || 1; const now = new Date(); const dateStr = now.toLocaleDateString('fr-FR'); const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-            const newOrder = { id: "CMD-" + Date.now(), timestamp: Date.now(), prodId: currentProduct.id, prodName: currentProduct.name, wave: wave, quantity: qty, minOrderRequired: parseInt(currentProduct.minQty) || 1, ref: currentProduct.uniqueId, client: clientName, phone: clientPhone, price: parseInt(document.getElementById('orderCustomPrice').value) || 0, qty: qty, total: (parseInt(document.getElementById('orderCustomPrice').value) || 0) * qty, status: (currentProduct.stock >= qty) ? "Validée" : "À Lancer", date: `${dateStr} à ${timeStr}` };
+            const newOrder = { 
+                id: "CMD-" + Date.now(), 
+                timestamp: Date.now(), 
+                prodId: currentProduct.id, 
+                prodName: currentProduct.name, 
+                wave: wave, 
+                quantity: qty, 
+                minOrderRequired: parseInt(currentProduct.minQty) || 1, 
+                ref: currentProduct.uniqueId, 
+                client: clientName, 
+                phone: clientPhone, 
+                price: parseInt(document.getElementById('orderCustomPrice').value) || 0, 
+                qty: qty, 
+                total: (parseInt(document.getElementById('orderCustomPrice').value) || 0) * qty, 
+                paymentReceived: parseInt(document.getElementById('orderPayment').value) || 0,
+                status: (currentProduct.stock >= qty) ? "Validée" : "À Lancer", 
+                date: `${dateStr} à ${timeStr}` 
+            };
             orders.push(newOrder); localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
             if(newOrder.status === "Validée") { const idx = products.findIndex(x => x && x.id === currentProduct.id); if(idx !== -1) { products[idx].stock -= newOrder.qty; localStorage.setItem(DB_KEY, JSON.stringify(products)); } }
             this.checkWaveThreshold(currentProduct.id); bootstrap.Modal.getInstance(document.getElementById('orderModal')).hide(); document.getElementById('successOverlay').style.display = 'flex';
@@ -811,7 +827,6 @@
                 if(c.avion?.vente) { const tot = (parseInt(c.avion.vente)||0) + (parseInt(c.avion.transit)||0) + (parseInt(c.avion.douane)||0) + (parseInt(c.avion.liv)||0); htmlPrices += `<div class="mb-2 p-2 border rounded"><div class="d-flex justify-content-between fw-bold text-primary"><span>✈️ AVION</span><span>${tot.toLocaleString()} ${curr}</span></div><div class="price-detail-box">Base: ${c.avion.vente} | Transit: ${c.avion.transit} | Douane: ${c.avion.douane} | Liv: ${c.avion.liv}</div></div>`; }
                 if(c.bateau?.vente) { const tot = (parseInt(c.bateau.vente)||0) + (parseInt(c.bateau.transit)||0) + (parseInt(c.bateau.douane)||0) + (parseInt(c.bateau.liv)||0); htmlPrices += `<div class="mb-2 p-2 border rounded"><div class="d-flex justify-content-between fw-bold text-info"><span>🚢 BATEAU</span><span>${tot.toLocaleString()} ${curr}</span></div><div class="price-detail-box">Base: ${c.bateau.vente} | Transit: ${c.bateau.transit} | Douane: ${c.bateau.douane} | Liv: ${c.bateau.liv}</div></div>`; }
                 if(c.direct?.ttc) { htmlPrices += `<div class="mb-2 p-2 border rounded bg-light"><div class="d-flex justify-content-between fw-bold text-success"><span>🏠 AU MAGASIN (Direct)</span><span>${c.direct.ttc.toLocaleString()} ${curr}</span></div></div>`; }
-                // Ajout dynamique du prix de gros s'il existe
                 if(c.direct?.grosTTC && c.direct?.grosQty) { htmlPrices += `<div class="mb-2 p-2 border border-warning rounded bg-warning-subtle"><div class="d-flex justify-content-between fw-bold text-dark"><span>💰 PRIX DE GROS</span><span>${c.direct.grosTTC.toLocaleString()} ${curr}</span></div><div class="text-muted" style="font-size:0.7rem;">Minimum: ${c.direct.grosQty} unités</div></div>`; }
             }
             document.getElementById('modalPriceList').innerHTML = htmlPrices || "<p class='text-muted'>Aucun prix configuré</p>"; this.loadBrandConfig(); new bootstrap.Modal(document.getElementById('productModal')).show(); appliquerRestrictions();
@@ -826,7 +841,6 @@
                 if(p.canaux.avion?.vente) { const c = p.canaux.avion; const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0); priceTxt += `✈️ *AVION :* ${tot.toLocaleString()} ${curr}\n`; }
                 if(p.canaux.bateau?.vente) { const c = p.canaux.bateau; const tot = (parseInt(c.vente)||0) + (parseInt(c.transit)||0) + (parseInt(c.douane)||0) + (parseInt(c.liv)||0); priceTxt += `🚢 *BATEAU :* ${tot.toLocaleString()} ${curr}\n`; }
                 if(p.canaux.direct?.ttc) { priceTxt += `🏠 *MAGASIN :* ${p.canaux.direct.ttc.toLocaleString()} ${curr}\n`; }
-                // Ajout des infos de gros dans le texte WhatsApp
                 if(p.canaux.direct?.grosTTC) { priceTxt += `💰 *GROS (${p.canaux.direct.grosQty}+ pcs) :* ${p.canaux.direct.grosTTC.toLocaleString()} ${curr}\n`; }
             }
             return `🌟 *DISPONIBILITÉ : ${config.companyName || "MT & B-One"}*\n━━━━━━━━━━━━━━━━━━\n\n📦 *Produit :* ${p.name}\n🔍 *Réf :* ${p.uniqueId}\n📊 *État :* ${stockTxt}\n🛒 *Qté Min. :* ${minT} unité(s)\n✨ *Qualités :* ${p.qualities || 'Qualité Premium'}\n\n💰 *TARIFS :*\n${priceTxt}\n📲 *Contact PDG :* https://wa.me/${phoneForLink}\n✍️ _Signé : ${config.ceoName || "L'Administrateur"}_`;
@@ -923,7 +937,6 @@
     const addForm = document.getElementById('addProductForm');
     if(addForm) { addForm.onsubmit = function(e) { Shop.saveProduct(e); }; }
 
-    // Démarrage : Sync et init
     initCloudSync(() => { Shop.init(); });
     window.onload = () => { Shop.init(); };
 </script>

@@ -111,7 +111,6 @@
     const APP_PREFIX = 'BONE_'; 
     const DB_PATH = 'data_sync/';
 
-    // --- 1. L'INTERCEPTEUR (Priorité Realtime) ---
     const nativeSetItem = localStorage.setItem;
     localStorage.setItem = function(key, value) {
         try {
@@ -132,7 +131,6 @@
         }
     };
 
-    // --- 2. LA SYNCHRO BIDIRECTIONNELLE ---
     window.initCloudSync = function(refreshCallback) {
         const dataRef = ref(db, DB_PATH);
         onValue(dataRef, (snapshot) => {
@@ -158,21 +156,11 @@
         });
     }
 
-    // Initialisation
     window.initCloudSync(() => {
         if(window.CartManager && typeof window.CartManager.renderOrders === 'function') {
             window.CartManager.renderOrders();
         }
     });
-
-    window.compressImage = function(videoId) {
-        const video = document.getElementById(videoId);
-        const canvas = document.createElement('canvas');
-        canvas.width = 300;
-        canvas.height = 300; 
-        canvas.getContext('2d').drawImage(video, 0, 0, 300, 300);
-        return canvas.toDataURL('image/jpeg', 0.6);
-    };
 </script>
 
 <header class="app-header shadow-lg no-print">
@@ -243,8 +231,8 @@
                             <tr>
                                 <th>Produit & Client</th>
                                 <th class="text-center">Qté</th>
-                                <th class="text-center">Détails Prix (U)</th>
-                                <th class="text-center">Règlement Global</th>
+                                <th class="text-center">Détails Règlement</th>
+                                <th class="text-center">Bilan Financier</th>
                                 <th class="text-center">Statut</th>
                                 <th class="text-end">Actions</th>
                             </tr>
@@ -267,11 +255,11 @@
                     <span id="totalValidated">0 F CFA</span>
                 </div>
                 <div class="summary-item">
-                    <span>Produit à commander</span>
+                    <span>Projets à lancer</span>
                     <span id="totalPending">0 F CFA</span>
                 </div>
                 <div class="summary-total">
-                    <span>TOTAL GÉNÉRAL</span>
+                    <span>VALEUR TOTALE</span>
                     <span id="grandTotal">0 F CFA</span>
                 </div>
                 <div class="d-grid gap-2 mt-4">
@@ -304,7 +292,7 @@
             <div class="recap-header">
                 <h5 class="fw-bold mb-0"><i class="bi bi-collection me-2"></i>Point de Vente Détaillé</h5>
                 <small>Décomposition des paiements et restes par poste</small>
-                <button type="button" class="btn-close btn-close-white position-absolute end-0 top-0 m-3" data-bs-toggle="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white position-absolute end-0 top-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="recap-body">
                 <div class="row g-3 mb-4">
@@ -361,7 +349,8 @@
             
             const session = JSON.parse(localStorage.getItem('BONE_USER_SESSION'));
             if(session && session.role === 'admin') {
-                document.getElementById('adminNotifGroup').style.setProperty('display', 'inline-block', 'important');
+                const adminNotif = document.getElementById('adminNotifGroup');
+                if(adminNotif) adminNotif.style.setProperty('display', 'inline-block', 'important');
             }
         },
 
@@ -390,44 +379,32 @@
             
             if (!this.orders || this.orders.length === 0) {
                 tbody.innerHTML = "";
-                emptyMsg.style.display = "block";
+                if(emptyMsg) emptyMsg.style.display = "block";
                 this.updateSummary(0, 0);
                 return;
             }
 
-            emptyMsg.style.display = "none";
+            if(emptyMsg) emptyMsg.style.display = "none";
             let totalVal = 0, totalPen = 0;
             
             const uniqueProducts = [...new Set(this.orders.map(o => o.prodName))];
-            select.innerHTML = '<option value="">-- Choisir un produit --</option>' + 
+            if(select) select.innerHTML = '<option value="">-- Choisir un produit --</option>' + 
                 uniqueProducts.map(name => `<option value="${name}">${name}</option>`).join('');
 
             const rows = this.orders.map((order) => {
-                const productFromDB = this.products.find(p => p.id === order.prodId) || 
-                                     this.products.find(p => p.name === order.prodName) || {};
+                const pDB = this.products.find(p => p.id === order.prodId) || {};
+                const img = pDB.img || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
                 
-                const img = productFromDB.img || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-                const qte = parseInt(order.quantity || order.qty) || 1;
-                const vBase = parseFloat(order.price) || 0;
-                const tPrice = parseFloat(order.transit) || 0;
-                const dPrice = parseFloat(order.douane) || 0;
-                const lPrice = parseFloat(order.livraison) || 0;
-                
-                const unitTotal = vBase + tPrice + dPrice + lPrice;
-                const globalTotal = unitTotal * qte;
-                
-                let calculatedPayed = 0;
-                if(order.isPricePayed) calculatedPayed += (vBase * qte);
-                if(order.isTransitPayed) calculatedPayed += (tPrice * qte);
-                if(order.isDouanePayed) calculatedPayed += (dPrice * qte);
-                if(order.isLivraisonPayed) calculatedPayed += (lPrice * qte);
+                const qte = parseInt(order.qty || order.quantity) || 1;
+                const totalGlobal = parseFloat(order.total) || 0;
+                const payed = parseFloat(order.paymentReceived) || 0;
+                const reste = totalGlobal - payed;
 
-                const resteFinancier = globalTotal - calculatedPayed;
                 const isValidee = order.status === "Validée";
-                if(isValidee) totalVal += globalTotal; else totalPen += globalTotal;
+                if(isValidee) totalVal += totalGlobal; else totalPen += totalGlobal;
 
-                const displayStatus = (order.status === "À lancer") ? "À commander" : (order.status || 'En attente');
                 const waveInfo = order.wave ? `<div class="badge bg-secondary" style="font-size:0.6rem;">Vague ${order.wave}</div>` : "";
+                const displayStatus = (order.status === "À Lancer") ? "À commander" : (order.status || 'En attente');
 
                 return `
                 <tr>
@@ -444,17 +421,14 @@
                     <td class="text-center fw-bold text-purple">${qte}</td>
                     <td>
                         <div class="d-flex justify-content-center gap-2">
-                            <div class="payment-detail-box"><span class="payment-label">Vente</span><span class="payment-value">${order.isPricePayed ? vBase.toLocaleString() : '0'}</span></div>
-                            <div class="payment-detail-box"><span class="payment-label">Trans.</span><span class="payment-value">${order.isTransitPayed ? tPrice.toLocaleString() : '0'}</span></div>
-                            <div class="payment-detail-box"><span class="payment-label">Douane</span><span class="payment-value">${order.isDouanePayed ? dPrice.toLocaleString() : '0'}</span></div>
-                            <div class="payment-detail-box"><span class="payment-label">Livr.</span><span class="payment-value">${order.isLivraisonPayed ? lPrice.toLocaleString() : '0'}</span></div>
+                             <div class="payment-detail-box"><span class="payment-label">Total</span><span class="payment-value text-primary">${totalGlobal.toLocaleString()}</span></div>
+                             <div class="payment-detail-box"><span class="payment-label">Reçu</span><span class="payment-value text-success">${payed.toLocaleString()}</span></div>
                         </div>
                     </td>
                     <td>
-                        <div class="d-flex justify-content-center gap-2 border-start ps-2">
-                            <div class="payment-detail-box"><span class="payment-label">Total</span><span class="payment-value text-primary">${globalTotal.toLocaleString()}</span></div>
-                            <div class="payment-detail-box"><span class="payment-label">Payé</span><span class="payment-value text-success">${calculatedPayed.toLocaleString()}</span></div>
-                            <div class="payment-detail-box"><span class="payment-label">Reste</span><span class="payment-value text-danger">${resteFinancier.toLocaleString()}</span></div>
+                        <div class="text-center">
+                            <span class="payment-label">RESTE À PAYER</span>
+                            <span class="payment-value ${reste > 0 ? 'text-danger' : 'text-success'}">${reste.toLocaleString()} F</span>
                         </div>
                     </td>
                     <td class="text-center"><span class="status-badge ${isValidee ? 'status-validee' : 'status-lancer'}">${displayStatus}</span></td>
@@ -503,35 +477,24 @@
             if(productName === "") { preview.innerText = "Sélectionnez un produit et une vague..."; return; }
             
             const config = JSON.parse(localStorage.getItem(CONFIG_KEY)) || {};
-            const clientOrders = this.orders.filter(o => o.prodName === productName && (o.wave == wave || (!o.wave && wave == 1)));
+            const clientOrders = this.orders.filter(o => o.prodName === productName && (o.wave == wave));
             
             let totalGlobal = 0, totalPayeGlobal = 0, totalQte = 0;
             let detailText = "";
 
             clientOrders.forEach((o, i) => {
-                const qte = parseInt(o.quantity || o.qty) || 1;
-                const vBase = parseFloat(o.price) || 0;
-                const tPrice = parseFloat(o.transit) || 0;
-                const dPrice = parseFloat(o.douane) || 0;
-                const lPrice = parseFloat(o.livraison) || 0;
-                const unitTotal = vBase + tPrice + dPrice + lPrice;
-                const globalTotal = unitTotal * qte;
-                let payed = 0;
-                if(o.isPricePayed) payed += (vBase * qte);
-                if(o.isTransitPayed) payed += (tPrice * qte);
-                if(o.isDouanePayed) payed += (dPrice * qte);
-                if(o.isLivraisonPayed) payed += (lPrice * qte);
-                totalGlobal += globalTotal;
+                const qte = parseInt(o.qty || o.quantity) || 1;
+                const total = parseFloat(o.total) || 0;
+                const payed = parseFloat(o.paymentReceived) || 0;
+                const reste = total - payed;
+
+                totalGlobal += total;
                 totalPayeGlobal += payed;
                 totalQte += qte;
 
                 detailText += `${i+1}. 👤 *${o.client || 'Client'}* (Qté: ${qte})\n` +
-                              `   💰 Vente: ${o.isPricePayed ? vBase.toLocaleString() : '0'} F [${o.isPricePayed ? '✅' : '❌'}]\n` +
-                              `   🚢 Transit: ${o.isTransitPayed ? tPrice.toLocaleString() : '0'} F [${o.isTransitPayed ? '✅' : '❌'}]\n` +
-                              `   🛃 Douane: ${o.isDouanePayed ? dPrice.toLocaleString() : '0'} F [${o.isDouanePayed ? '✅' : '❌'}]\n` +
-                              `   🚚 Livr: ${o.isLivraisonPayed ? lPrice.toLocaleString() : '0'} F [${o.isLivraisonPayed ? '✅' : '❌'}]\n` +
-                              `   💵 TOTAL: ${globalTotal.toLocaleString()} F | ✅ PAYÉ: ${payed.toLocaleString()} F\n` +
-                              `   🛑 RESTE: ${(globalTotal - payed).toLocaleString()} F\n` +
+                              `   💰 TOTAL: ${total.toLocaleString()} F | ✅ REÇU: ${payed.toLocaleString()} F\n` +
+                              `   🛑 RESTE: ${reste.toLocaleString()} F\n` +
                               `   __________________________\n\n`;
             });
 
@@ -551,50 +514,63 @@
         },
 
         copyAllOrdersRecap() {
-            const config = JSON.parse(localStorage.getItem(CONFIG_KEY)) || {};
+            this.orders = JSON.parse(localStorage.getItem(ORDERS_KEY)) || [];
             if(this.orders.length === 0) return alert("Aucune commande à copier.");
-            const availableWaves = [...new Set(this.orders.map(o => o.wave || 1))].sort((a,b) => b-a);
-            const selectedWave = prompt(`Vague pour rapport global:`, availableWaves[0]);
-            if(!selectedWave) return;
-            const waveNum = parseInt(selectedWave);
-            const filteredOrders = this.orders.filter(o => (o.wave || 1) == waveNum);
-            if(filteredOrders.length === 0) return alert("Aucune commande pour cette vague.");
 
-            const grouped = filteredOrders.reduce((acc, order) => {
+            const config = JSON.parse(localStorage.getItem(CONFIG_KEY)) || {};
+            const waves = [...new Set(this.orders.map(o => o.wave || 1))].sort((a,b) => b-a);
+            
+            const selectedWave = prompt(`Vague pour rapport global:`, waves[0]);
+            if(!selectedWave) return;
+            
+            const waveNum = parseInt(selectedWave);
+            const filtered = this.orders.filter(o => (o.wave || 1) == waveNum);
+            if(filtered.length === 0) return alert("Aucune commande pour cette vague.");
+
+            const grouped = filtered.reduce((acc, order) => {
                 if (!acc[order.prodName]) acc[order.prodName] = [];
                 acc[order.prodName].push(order);
                 return acc;
             }, {});
 
-            let finalMsg = `*RÉCAPITULATIF GÉNÉRAL DES VENTES (VAGUE ${waveNum})*\n🏢 *${config.companyName || 'MT & B-One'}*\n📅 Date : ${new Date().toLocaleDateString('fr-FR')}\n\n`;
+            let finalMsg = `*RÉCAPITULATIF DES VENTES (VAGUE ${waveNum})*\n🏢 *${config.companyName || 'MT & B-One'}*\n📅 Date : ${new Date().toLocaleDateString('fr-FR')}\n\n`;
 
-            for (const productName in grouped) {
-                let totalProdValue = 0, totalProdPayed = 0, totalProdQte = 0;
-                let detailText = "";
-                grouped[productName].forEach((o, i) => {
-                    const qte = parseInt(o.quantity || o.qty) || 1;
-                    const vBase = parseFloat(o.price) || 0;
-                    const tPrice = parseFloat(o.transit) || 0;
-                    const dPrice = parseFloat(o.douane) || 0;
-                    const lPrice = parseFloat(o.livraison) || 0;
-                    const unitTotal = vBase + tPrice + dPrice + lPrice;
-                    const globalTotal = unitTotal * qte;
-                    let payed = 0;
-                    if(o.isPricePayed) payed += (vBase * qte);
-                    if(o.isTransitPayed) payed += (tPrice * qte);
-                    if(o.isDouanePayed) payed += (dPrice * qte);
-                    if(o.isLivraisonPayed) payed += (lPrice * qte);
-                    totalProdValue += globalTotal; totalProdPayed += payed; totalProdQte += qte;
-
-                    detailText += `${i+1}. 👤 *${o.client}* (Qté: ${qte})\n` +
-                                  `   💵 TOTAL: ${globalTotal.toLocaleString()} F | ✅ PAYÉ: ${payed.toLocaleString()} F\n` +
-                                  `   🛑 RESTE: ${(globalTotal - payed).toLocaleString()} F\n`;
+            for (const prod in grouped) {
+                let vP = 0, pP = 0;
+                let details = "";
+                grouped[prod].forEach((o, i) => {
+                    const total = parseFloat(o.total) || 0;
+                    const paid = parseFloat(o.paymentReceived) || 0;
+                    vP += total; 
+                    pP += paid;
+                    details += `${i+1}. 👤 *${o.client}* (x${o.qty || 1}) | ✅ ${paid.toLocaleString()} / ${total.toLocaleString()} F\n`;
                 });
-                finalMsg += `*PRODUIT : ${productName.toUpperCase()}*\n` + detailText +
-                            `📊 BILAN : ${totalProdValue.toLocaleString()} F (${totalProdPayed.toLocaleString()} encaissé)\n\n`;
+                finalMsg += `*PRODUIT : ${prod.toUpperCase()}*\n` + details +
+                            `📊 BILAN : ${vP.toLocaleString()} F (${pP.toLocaleString()} encaissé)\n\n`;
             }
             finalMsg += `✍️ _Signé : ${config.ceoName || 'Le PDG'}_`;
-            navigator.clipboard.writeText(finalMsg).then(() => alert("Copié !"));
+
+            // Logique de copie corrigée
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(finalMsg).then(() => {
+                    alert("Récapitulatif de la vague " + waveNum + " copié avec succès !");
+                }).catch(err => {
+                    console.error('Erreur lors de la copie : ', err);
+                });
+            } else {
+                // Fallback pour navigateurs anciens ou contextes non sécurisés
+                const textArea = document.createElement("textarea");
+                textArea.value = finalMsg;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert("Récapitulatif copié ! (via fallback)");
+                } catch (err) {
+                    alert("Impossible de copier le texte.");
+                }
+                document.body.removeChild(textArea);
+            }
         },
 
         copyAndCloseRecap() {
